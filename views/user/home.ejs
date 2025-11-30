@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thinky - Home</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+      <a class="navbar-brand" href="/">
+        <i class="bi bi-book-fill me-2"></i>Thinky
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link active" href="/">
+              <i class="bi bi-house-fill me-1"></i>Home
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/admin/login">
+              <i class="bi bi-shield-lock-fill me-1"></i>Login
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <div class="container mt-4">
+
+    <!-- Search -->
+    <div class="mb-3 position-relative">
+      <form class="d-flex" method="GET" action="/search" role="search" autocomplete="off">
+        <input name="q" id="siteSearch" class="form-control me-2" type="search" placeholder="Search subjects..." aria-label="Search" autocomplete="off">
+        <button class="btn btn-outline-pink" type="submit"><i class="bi bi-search"></i> Search</button>
+      </form>
+
+      <!-- Typeahead suggestions -->
+      <div id="searchSuggestions" class="list-group position-absolute" style="z-index:1050; top:100%; left:0; right:0; display:none;
+        margin-top:0.5rem; border-radius:8px; overflow:hidden;"></div>
+    </div>
+
+    <!-- Subjects Section -->
+    <div class="mb-4">
+      <h2 class="mb-4" style="color: var(--dark-pink); font-weight: 700;">
+        <i class="bi bi-collection-fill me-2"></i>Subjects
+      </h2>
+      
+      <% if (subjects.length === 0) { %>
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          No subjects available yet. Please check back later!
+        </div>
+      <% } else { %>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+          <% subjects.forEach(subject => { %>
+            <div class="col">
+              <div class="card h-100">
+                <div class="card-header">
+                  <i class="bi bi-book me-2"></i><%= subject.name %>
+                </div>
+                <div class="card-body">
+                  <p class="card-text">
+                    <%= subject.description || 'Explore review materials for this subject.' %>
+                  </p>
+                  <a href="/subject/<%= subject.id %>/reviewers" class="btn btn-primary">
+                    <i class="bi bi-eye-fill me-2"></i>View Reviewers
+                  </a>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Simple debounced typeahead for subjects
+    (function(){
+      var input = document.getElementById('siteSearch');
+      var box = document.getElementById('searchSuggestions');
+      if (!input || !box) return;
+
+      var timer = null;
+      var lastQ = '';
+
+      function clearBox(){ box.innerHTML=''; box.style.display='none'; }
+
+      function render(results){
+        box.innerHTML = '';
+        if (!results || !results.length){ clearBox(); return; }
+        results.forEach(function(s){
+          var a = document.createElement('a');
+          a.className = 'list-group-item list-group-item-action';
+          a.href = '/subject/' + s.id + '/reviewers';
+          a.innerHTML = '<strong>' + (s.name || '') + '</strong>' + (s.description ? '<div class="small text-muted">'+ (s.description.length>120? s.description.substring(0,120)+'...':s.description) +'</div>' : '');
+          box.appendChild(a);
+        });
+        box.style.display = 'block';
+      }
+
+      function fetchSuggestions(q){
+        if (!q || q.length < 1){ clearBox(); return; }
+        if (q === lastQ) return;
+        lastQ = q;
+        fetch('/api/search-subjects?q=' + encodeURIComponent(q))
+          .then(function(res){ return res.json(); })
+          .then(function(json){ render(json.subjects || []); })
+          .catch(function(){ clearBox(); });
+      }
+
+      input.addEventListener('input', function(e){
+        var q = (e.target.value || '').trim();
+        clearTimeout(timer);
+        timer = setTimeout(function(){ fetchSuggestions(q); }, 250);
+      });
+
+      // hide when clicking outside
+      document.addEventListener('click', function(ev){ if (!box.contains(ev.target) && ev.target !== input) clearBox(); });
+      // hide on escape
+      input.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') clearBox(); });
+    })();
+  </script>
+</body>
+</html>
