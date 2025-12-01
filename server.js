@@ -508,9 +508,6 @@ if (require.main === module) {
   });
 }
 
-// Export app for serverless wrappers and testing
-module.exports = app;
-
 // Simple quiz view placeholder (shows quiz summary if present)
 app.get('/reviewer/:id/quiz', async (req, res) => {
   try {
@@ -551,3 +548,6 @@ app.get('/reviewer/:id/quiz', async (req, res) => {
     }
   }
 });
+
+// Export app for serverless wrappers and testing
+module.exports = app;
