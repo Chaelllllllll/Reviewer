@@ -35,6 +35,19 @@ async function loadReviewer() {
     const content = document.getElementById('reviewerContent');
     content.innerHTML = reviewer.content || '<p class="text-muted">No content available.</p>';
 
+    // Render action buttons (Download & Take Quiz)
+    const actions = document.getElementById('reviewerActions');
+    if (actions) {
+      actions.style.display = 'block';
+      actions.innerHTML = `
+        <button class="btn btn-pink me-2" onclick="downloadPdf()">
+          <i class="bi bi-file-earmark-arrow-down"></i> Download as PDF
+        </button>
+        <button class="btn btn-outline-pink" onclick="goToQuiz()">
+          <i class="bi bi-question-circle"></i> Take Quiz
+        </button>
+      `;
+    }
   } catch (error) {
     console.error('Error loading reviewer:', error);
     const content = document.getElementById('reviewerContent');
