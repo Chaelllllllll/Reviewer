@@ -1,4 +1,4 @@
-// Load environment variables (only in development)
+  // Load environment variables (only in development)
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   require('dotenv').config();
 }
