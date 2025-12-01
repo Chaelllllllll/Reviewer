@@ -465,10 +465,15 @@ app.get('/api/search-subjects', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+// Only start server when run directly (not when required by serverless wrapper)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
+
+// Export app for serverless wrappers and testing
+module.exports = app;
 
 // Simple quiz view placeholder (shows quiz summary if present)
 app.get('/reviewer/:id/quiz', async (req, res) => {
