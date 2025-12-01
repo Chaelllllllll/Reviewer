@@ -3,17 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thinky - Reviewer</title>
+  <title>Reviewer - Thinky</title>
+  
+  <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="/public/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+  
+  <style>
+    .content-section {
+      background: white;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 5px 15px var(--shadow);
+      margin-bottom: 2rem;
+    }
+    
+    .content-section h1, .content-section h2, .content-section h3 {
+      color: var(--pink-darker);
+      margin-top: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .content-section table {
+      width: 100%;
+      margin: 1rem 0;
+    }
+    
+    .content-section table th {
+      background-color: var(--pink-light);
+      padding: 0.75rem;
+    }
+    
+    .content-section table td {
+      padding: 0.75rem;
+      border: 1px solid var(--pink-light);
+    }
+    
+    .content-section pre {
+      background-color: #f8f9fa;
+      padding: 1rem;
+      border-radius: 10px;
+      border-left: 4px solid var(--pink-primary);
+      overflow-x: auto;
+    }
+    
+    .content-section code {
+      background-color: var(--pink-lighter);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      color: var(--pink-darker);
+      font-family: 'Courier New', monospace;
+    }
+    
+    .content-section pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+  </style>
 </head>
 <body>
-  <!-- Navigation -->
-  <nav class="navbar navbar-expand-lg navbar-dark">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light">
     <div class="container">
-      <a class="navbar-brand" href="/">
-        <i class="bi bi-book-fill me-2"></i>Thinky
+      <a class="navbar-brand" href="/index.html">
+        <i class="bi bi-lightbulb-fill"></i> Thinky
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
@@ -21,39 +77,95 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
-            <a class="nav-link" href="/">
-              <i class="bi bi-house-fill me-1"></i>Home
-            </a>
+            <a class="nav-link" href="/index.html">Home</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/admin/login.html">
-              <i class="bi bi-shield-lock-fill me-1"></i>Login
-            </a>
+            <a class="nav-link" href="/admin/login.html">Admin</a>
           </li>
         </ul>
       </div>
     </div>
   </nav>
 
-  <div class="container mt-4">
-    <div id="breadcrumb"></div>
-    <div id="reviewerContent">
-      <div class="text-center">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
+  <!-- Main Content -->
+  <div class="content-wrapper">
+    <div class="container">
+      <!-- Back Button -->
+      <div class="row mb-3">
+        <div class="col-12">
+          <button onclick="history.back()" class="btn btn-outline-pink">
+            <i class="bi bi-arrow-left"></i> Back
+          </button>
+        </div>
+      </div>
+
+      <!-- Reviewer Title -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center py-4" id="reviewerHeader">
+              <div class="spinner-border spinner-pink" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reviewer Content -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="content-section" id="reviewerContent">
+            <div class="text-center py-5">
+              <div class="spinner-border spinner-pink" role="status">
+                <span class="visually-hidden">Loading content...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quiz Section -->
+      <div class="row" id="quizSection" style="display: none;">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="mb-0">
+                <i class="bi bi-patch-question-fill"></i> Quiz Time!
+              </h3>
+            </div>
+            <div class="card-body">
+              <div id="quizContainer"></div>
+              <div class="mt-4 text-center" id="quizActions">
+                <button class="btn btn-pink btn-lg" onclick="submitQuiz()">
+                  <i class="bi bi-check-circle"></i> Submit Quiz
+                </button>
+              </div>
+              <div id="quizResults" style="display: none;" class="mt-4"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Footer -->
-  <footer class="footer mt-5">
+  <footer class="footer">
     <div class="container">
-      <p>&copy; 2025 Thinky. All rights reserved.</p>
+      <p class="mb-0">&copy; 2025 Thinky. Made with <i class="bi bi-heart-fill text-pink"></i> for learners everywhere.</p>
     </div>
   </footer>
 
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/public/js/reviewer.js"></script>
+  
+  <!-- Supabase Config -->
+  <script src="/js/supabase-config.js"></script>
+  
+  <!-- Page Script -->
+  <script src="/js/reviewer.js"></script>
 </body>
 </html>

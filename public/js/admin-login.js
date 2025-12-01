@@ -1,32 +1,45 @@
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const errorDiv = document.getElementById('errorMessage');
-  errorDiv.style.display = 'none';
+// Check if already logged in
+async function checkIfLoggedIn() {
+  const user = await getCurrentUser();
+  if (user) {
+    window.location.href = '/admin/dashboard.html';
+  }
+}
+
+// Handle login form submission
+async function handleLogin(event) {
+  event.preventDefault();
   
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
+  const loginBtn = document.getElementById('loginBtn');
+  const errorDiv = document.getElementById('errorMessage');
+  const errorText = document.getElementById('errorText');
+  
+  // Disable button and show loading
+  loginBtn.disabled = true;
+  loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Signing in...';
+  errorDiv.style.display = 'none';
   
   try {
-    const response = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    const { data, error } = await signIn(email, password);
     
-    const data = await response.json();
+    if (error) throw error;
     
-    if (response.ok && data.success) {
-      window.location.href = '/admin/dashboard.html';
-    } else {
-      errorDiv.textContent = data.error || 'Invalid email or password';
-      errorDiv.style.display = 'block';
-    }
+    // Success - redirect to dashboard
+    window.location.href = '/admin/dashboard.html';
+    
   } catch (error) {
     console.error('Login error:', error);
-    errorDiv.textContent = 'An error occurred. Please try again.';
+    
+    errorText.textContent = error.message || 'Invalid email or password. Please try again.';
     errorDiv.style.display = 'block';
+    
+    // Re-enable button
+    loginBtn.disabled = false;
+    loginBtn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Sign In';
   }
-});
+}
+
+// Check login status on page load
+document.addEventListener('DOMContentLoaded', checkIfLoggedIn);

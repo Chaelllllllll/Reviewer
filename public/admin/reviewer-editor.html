@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reviewer Editor - Thinky</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+  
+  <!-- Quill CSS -->
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+  
+  <style>
+    .editor-container {
+      background: white;
+      border-radius: 15px;
+      padding: 1.5rem;
+      box-shadow: 0 5px 15px var(--shadow);
+    }
+    
+    #editor {
+      min-height: 400px;
+      border: 2px solid var(--pink-light);
+      border-radius: 10px;
+    }
+    
+    .ql-toolbar {
+      border-radius: 10px 10px 0 0;
+      background-color: var(--pink-lighter);
+      border: 2px solid var(--pink-light);
+      border-bottom: none;
+    }
+    
+    .ql-container {
+      border-radius: 0 0 10px 10px;
+      border: 2px solid var(--pink-light);
+      border-top: none;
+    }
+    
+    .quiz-question-card {
+      background: var(--pink-lighter);
+      border: 2px solid var(--pink-light);
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .quiz-question-card:hover {
+      border-color: var(--pink-primary);
+    }
+    
+    .option-input {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Admin Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/admin/dashboard.html">
+        <i class="bi bi-gear-fill"></i> Admin Dashboard
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <button class="btn btn-pink me-2" onclick="saveReviewer()">
+              <i class="bi bi-save"></i> Save Reviewer
+            </button>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="handleLogout()">
+              <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="content-wrapper">
+    <div class="container-fluid">
+      <!-- Back Button -->
+      <div class="row mb-3">
+        <div class="col-12">
+          <button onclick="goBack()" class="btn btn-outline-pink">
+            <i class="bi bi-arrow-left"></i> Back
+          </button>
+        </div>
+      </div>
+
+      <!-- Page Title -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <h2 class="text-pink fw-bold" id="pageTitle">
+            <i class="bi bi-file-text"></i> Create Reviewer
+          </h2>
+        </div>
+      </div>
+
+      <!-- Reviewer Form -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="editor-container">
+            <div class="mb-3">
+              <label for="reviewerTitle" class="form-label fw-bold">Title *</label>
+              <input type="text" class="form-control" id="reviewerTitle" placeholder="Enter reviewer title" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">Content *</label>
+              <div id="editor"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quiz Builder Section -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h4 class="mb-0">
+                <i class="bi bi-patch-question"></i> Quiz Builder
+              </h4>
+              <button class="btn btn-pink btn-sm" onclick="showAddQuestionModal()">
+                <i class="bi bi-plus-circle"></i> Add Question
+              </button>
+            </div>
+            <div class="card-body">
+              <div id="quizContainer">
+                <p class="text-muted text-center py-4">No quiz questions yet. Click "Add Question" to create one.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save Button (Bottom) -->
+      <div class="row mb-4">
+        <div class="col-12 text-center">
+          <button class="btn btn-pink btn-lg px-5" onclick="saveReviewer()">
+            <i class="bi bi-save"></i> Save Reviewer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Question Modal -->
+  <div class="modal fade" id="questionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="questionModalTitle">Add Question</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="questionForm">
+            <input type="hidden" id="questionIndex">
+            
+            <div class="mb-3">
+              <label for="questionText" class="form-label">Question *</label>
+              <textarea class="form-control" id="questionText" rows="3" required></textarea>
+            </div>
+            
+            <div class="mb-3">
+              <label for="questionType" class="form-label">Question Type *</label>
+              <select class="form-select" id="questionType" onchange="handleQuestionTypeChange()">
+                <option value="multiple_choice">Multiple Choice</option>
+                <option value="short_answer">Short Answer</option>
+                <option value="long_answer">Long Answer</option>
+              </select>
+            </div>
+            
+            <!-- Multiple Choice Options -->
+            <div id="multipleChoiceSection">
+              <label class="form-label">Options *</label>
+              <div id="optionsContainer">
+                <div class="option-input">
+                  <input type="radio" name="correctOption" value="0">
+                  <input type="text" class="form-control" placeholder="Option 1" data-option-index="0">
+                  <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOption(0)" style="display: none;">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+                <div class="option-input">
+                  <input type="radio" name="correctOption" value="1">
+                  <input type="text" class="form-control" placeholder="Option 2" data-option-index="1">
+                  <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOption(1)" style="display: none;">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-pink mt-2" onclick="addOption()">
+                <i class="bi bi-plus"></i> Add Option
+              </button>
+              <p class="text-muted small mt-2">Select the radio button next to the correct answer</p>
+            </div>
+            
+            <!-- Answer for non-multiple choice -->
+            <div id="answerSection" style="display: none;">
+              <div class="mb-3">
+                <label for="sampleAnswer" class="form-label">Sample Answer (Optional)</label>
+                <textarea class="form-control" id="sampleAnswer" rows="3" placeholder="Provide a sample answer for reference"></textarea>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="questionPoints" class="form-label">Points</label>
+              <input type="number" class="form-control" id="questionPoints" value="1" min="1">
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-pink" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-pink" onclick="saveQuestion()">
+            <i class="bi bi-save"></i> Save Question
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Quill JS -->
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  
+  <!-- Supabase Config -->
+  <script src="/js/supabase-config.js"></script>
+  
+  <!-- Page Script -->
+  <script src="/js/admin-reviewer-editor.js"></script>
+</body>
+</html>
