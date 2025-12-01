@@ -71,18 +71,26 @@ const requireAuth = (req, res, next) => {
 
 // Home page - List all subjects
 app.get('/', async (req, res) => {
+  console.log('Home route hit');
   try {
+    console.log('Fetching subjects from Supabase...');
     const { data: subjects, error } = await supabase
       .from('subjects')
       .select('*')
       .order('name');
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
 
+    console.log('Subjects fetched:', subjects?.length || 0);
+    console.log('Attempting to render user/home...');
     res.render('user/home', { subjects: subjects || [] });
+    console.log('Render complete');
   } catch (error) {
-    console.error('Error fetching subjects:', error);
-    res.render('user/home', { subjects: [] });
+    console.error('Error in home route:', error);
+    res.status(500).send(`Error: ${error.message}`);
   }
 });
 
