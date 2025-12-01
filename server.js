@@ -61,7 +61,10 @@ app.use(session({
     sameSite: 'lax'
   }
 }));
+
+// Static files - adjusted for serverless
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // Set view engine
 app.set('view engine', 'ejs');
