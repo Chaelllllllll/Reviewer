@@ -2,9 +2,6 @@
 const urlParams = new URLSearchParams(window.location.search);
 const reviewerId = urlParams.get('id');
 
-let quizData = [];
-let userAnswers = {};
-
 if (!reviewerId) {
   window.location.href = '/index.html';
 }
@@ -49,185 +46,35 @@ async function loadReviewer() {
     `;
   }
 }
+// Download reviewer content as PDF (opens print dialog)
+function downloadPdf() {
+  const content = document.getElementById('reviewerContent').innerHTML;
+  const titleEl = document.querySelector('#reviewerHeader h1');
+  const title = titleEl ? titleEl.textContent : 'Reviewer';
 
-// Load quiz questions
-async function loadQuiz() {
-  try {
-    const { data: quizzes, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('reviewer_id', reviewerId)
-      .order('order_index', { ascending: true });
-
-    if (error) throw error;
-
-    if (!quizzes || quizzes.length === 0) {
-      return; // No quiz available
-    }
-
-    quizData = quizzes;
-    const quizSection = document.getElementById('quizSection');
-    const container = document.getElementById('quizContainer');
-
-    quizSection.style.display = 'block';
-
-    container.innerHTML = quizzes.map((quiz, index) => {
-      return `
-        <div class="mb-4 p-4" style="background-color: var(--pink-lighter); border-radius: 15px;">
-          <h5 class="fw-bold mb-3">
-            Question ${index + 1} 
-            <span class="badge badge-pink">${quiz.points} ${quiz.points === 1 ? 'point' : 'points'}</span>
-          </h5>
-          <p class="mb-3">${escapeHtml(quiz.question)}</p>
-          
-          ${renderQuizQuestion(quiz, index)}
-        </div>
-      `;
-    }).join('');
-
-  } catch (error) {
-    console.error('Error loading quiz:', error);
-  }
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>body{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif; padding:20px; color:#333}</style>
+      </head>
+      <body>
+        <h1>${escapeHtml(title)}</h1>
+        ${content}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+  // do not auto-close to allow user to save if needed
 }
 
-// Render quiz question based on type
-function renderQuizQuestion(quiz, index) {
-  switch (quiz.type) {
-    case 'multiple_choice':
-      const options = JSON.parse(quiz.options || '[]');
-      return `
-        <div class="quiz-options">
-          ${options.map((option, optIndex) => `
-            <div class="quiz-option" onclick="selectOption(${index}, ${optIndex})">
-              <input type="radio" name="quiz_${index}" id="quiz_${index}_${optIndex}" value="${optIndex}" style="display: none;">
-              <label for="quiz_${index}_${optIndex}" class="w-100 mb-0" style="cursor: pointer;">
-                ${escapeHtml(option)}
-              </label>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    
-    case 'short_answer':
-      return `
-        <input type="text" class="form-control" id="quiz_${index}" placeholder="Type your answer here..." 
-          onchange="userAnswers[${index}] = this.value">
-      `;
-    
-    case 'long_answer':
-      return `
-        <textarea class="form-control" id="quiz_${index}" rows="5" placeholder="Type your answer here..." 
-          onchange="userAnswers[${index}] = this.value"></textarea>
-      `;
-    
-    default:
-      return '<p class="text-muted">Invalid question type</p>';
-  }
-}
-
-// Select multiple choice option
-function selectOption(questionIndex, optionIndex) {
-  userAnswers[questionIndex] = optionIndex;
-  
-  // Update UI
-  const options = document.querySelectorAll(`input[name="quiz_${questionIndex}"]`);
-  options.forEach((opt, idx) => {
-    const parent = opt.closest('.quiz-option');
-    if (idx === optionIndex) {
-      opt.checked = true;
-      parent.classList.add('selected');
-    } else {
-      opt.checked = false;
-      parent.classList.remove('selected');
-    }
-  });
-}
-
-// Submit quiz
-function submitQuiz() {
-  let totalPoints = 0;
-  let earnedPoints = 0;
-
-  quizData.forEach((quiz, index) => {
-    totalPoints += quiz.points;
-    
-    if (quiz.type === 'multiple_choice') {
-      const correctAnswer = parseInt(quiz.correct_answer);
-      const userAnswer = userAnswers[index];
-      
-      if (userAnswer === correctAnswer) {
-        earnedPoints += quiz.points;
-        
-        // Mark as correct
-        const option = document.querySelector(`input[name="quiz_${index}"][value="${userAnswer}"]`);
-        if (option) {
-          option.closest('.quiz-option').classList.remove('selected');
-          option.closest('.quiz-option').classList.add('correct');
-        }
-      } else {
-        // Mark user's answer as incorrect
-        if (userAnswer !== undefined) {
-          const option = document.querySelector(`input[name="quiz_${index}"][value="${userAnswer}"]`);
-          if (option) {
-            option.closest('.quiz-option').classList.remove('selected');
-            option.closest('.quiz-option').classList.add('incorrect');
-          }
-        }
-        
-        // Show correct answer
-        const correctOption = document.querySelector(`input[name="quiz_${index}"][value="${correctAnswer}"]`);
-        if (correctOption) {
-          correctOption.closest('.quiz-option').classList.add('correct');
-        }
-      }
-    } else {
-      // For short/long answer, just show if they answered
-      if (userAnswers[index] && userAnswers[index].trim()) {
-        earnedPoints += quiz.points; // Auto-award points for subjective questions
-      }
-    }
-  });
-
-  const percentage = Math.round((earnedPoints / totalPoints) * 100);
-  
-  const resultsDiv = document.getElementById('quizResults');
-  const actionsDiv = document.getElementById('quizActions');
-  
-  actionsDiv.style.display = 'none';
-  resultsDiv.style.display = 'block';
-  
-  resultsDiv.innerHTML = `
-    <div class="card">
-      <div class="card-body text-center py-5">
-        <h2 class="text-pink mb-3">
-          <i class="bi bi-trophy-fill"></i> Quiz Complete!
-        </h2>
-        <h1 class="display-1 text-pink fw-bold mb-3">${percentage}%</h1>
-        <p class="lead mb-3">You scored ${earnedPoints} out of ${totalPoints} points</p>
-        <button class="btn btn-pink btn-lg" onclick="retakeQuiz()">
-          <i class="bi bi-arrow-clockwise"></i> Retake Quiz
-        </button>
-      </div>
-    </div>
-  `;
-  
-  // Scroll to results
-  resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-// Retake quiz
-function retakeQuiz() {
-  userAnswers = {};
-  loadQuiz();
-  
-  const resultsDiv = document.getElementById('quizResults');
-  const actionsDiv = document.getElementById('quizActions');
-  
-  resultsDiv.style.display = 'none';
-  actionsDiv.style.display = 'block';
-  
-  // Scroll to quiz
-  document.getElementById('quizSection').scrollIntoView({ behavior: 'smooth' });
+// Open quiz page for this reviewer
+function goToQuiz() {
+  window.location.href = `/quiz.html?id=${reviewerId}`;
 }
 
 // Utility function to escape HTML
@@ -240,5 +87,4 @@ function escapeHtml(text) {
 // Load data when page loads
 document.addEventListener('DOMContentLoaded', () => {
   loadReviewer();
-  loadQuiz();
 });

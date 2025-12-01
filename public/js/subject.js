@@ -69,11 +69,6 @@ async function loadReviewers() {
         <div class="card">
           <div class="card-body">
             <div class="row align-items-center">
-              <div class="col-md-1 text-center">
-                <div class="badge-pink">
-                  ${index + 1}
-                </div>
-              </div>
               <div class="col-md-8">
                 <h5 class="card-title mb-1">${escapeHtml(reviewer.title)}</h5>
                 <small class="text-muted">
