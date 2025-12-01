@@ -50,52 +50,40 @@ app.use(session({
   }
 }));
 
-// Static files - adjusted for serverless
+// Static files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
-
-// Set view engine
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 
 // Authentication middleware
 const requireAuth = (req, res, next) => {
   if (req.session.user) {
     next();
   } else {
-    res.redirect('/admin/login');
+    res.status(401).json({ error: 'Unauthorized' });
   }
 };
 
-// ========== USER ROUTES ==========
+// ========== API ROUTES ==========
 
-// Home page - List all subjects
-app.get('/', async (req, res) => {
-  console.log('Home route hit');
+// Get all subjects
+app.get('/api/subjects', async (req, res) => {
   try {
-    console.log('Fetching subjects from Supabase...');
     const { data: subjects, error } = await supabase
       .from('subjects')
       .select('*')
       .order('name');
 
-    if (error) {
-      console.error('Supabase error:', error);
-      throw error;
-    }
+    if (error) throw error;
 
-    console.log('Subjects fetched:', subjects?.length || 0);
-    console.log('Attempting to render user/home...');
-    res.render('user/home', { subjects: subjects || [] });
-    console.log('Render complete');
+    res.json({ subjects: subjects || [] });
   } catch (error) {
-    console.error('Error in home route:', error);
-    res.status(500).send(`Error: ${error.message}`);
+    console.error('Error fetching subjects:', error);
+    res.status(500).json({ error: 'Failed to fetch subjects' });
   }
 });
 
-// View reviewers for a subject
-app.get('/subject/:id/reviewers', async (req, res) => {
+// Get subject with reviewers
+app.get('/api/subject/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -115,18 +103,18 @@ app.get('/subject/:id/reviewers', async (req, res) => {
 
     if (reviewersError) throw reviewersError;
 
-    res.render('user/reviewers', { 
+    res.json({ 
       subject,
       reviewers: reviewers || [] 
     });
   } catch (error) {
-    console.error('Error fetching reviewers:', error);
-    res.redirect('/');
+    console.error('Error fetching subject:', error);
+    res.status(500).json({ error: 'Failed to fetch subject' });
   }
 });
 
-// View single reviewer
-app.get('/reviewer/:id', async (req, res) => {
+// Get single reviewer
+app.get('/api/reviewer/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -144,35 +132,73 @@ app.get('/reviewer/:id', async (req, res) => {
 
     if (error) throw error;
 
-    // Ensure quiz is a parsed object (some DBs return stored JSON as string)
+    // Ensure quiz is a parsed object
     try {
       if (reviewer && reviewer.quiz && typeof reviewer.quiz === 'string') {
         reviewer.quiz = JSON.parse(reviewer.quiz);
-        console.log('Parsed reviewer.quiz for reviewer', id);
       }
     } catch (e) {
       console.warn('Could not parse reviewer.quiz for reviewer', id, e);
     }
 
-    res.render('user/reviewer-detail', { reviewer });
+    res.json({ reviewer });
   } catch (error) {
     console.error('Error fetching reviewer:', error);
-    res.redirect('/');
+    res.status(500).json({ error: 'Failed to fetch reviewer' });
   }
 });
 
-// ========== ADMIN ROUTES ==========
+// Search subjects
+app.get('/api/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) {
+      return res.json({ subjects: [] });
+    }
 
-// Admin login page
-app.get('/admin/login', (req, res) => {
-  if (req.session.user) {
-    return res.redirect('/admin/dashboard');
+    const like = `%${q.replace(/%/g, '\\%')}%`;
+
+    const { data: subjects, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .ilike('name', like)
+      .order('name');
+
+    if (error) throw error;
+
+    res.json({ subjects: subjects || [] });
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ subjects: [] });
   }
-  res.render('admin/login', { error: null });
 });
 
-// Admin login POST
-app.post('/admin/login', async (req, res) => {
+// Search subjects typeahead
+app.get('/api/search-subjects', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.json({ subjects: [] });
+    
+    const like = `%${q.replace(/%/g, '\\%')}%`;
+    const { data: subjects, error } = await supabase
+      .from('subjects')
+      .select('id, name, description')
+      .ilike('name', like)
+      .order('name')
+      .limit(10);
+      
+    if (error) throw error;
+    res.json({ subjects: subjects || [] });
+  } catch (err) {
+    console.error('API search error:', err);
+    res.status(500).json({ subjects: [] });
+  }
+});
+
+// ========== ADMIN API ROUTES ==========
+
+// Admin login
+app.post('/api/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
@@ -184,102 +210,45 @@ app.post('/admin/login', async (req, res) => {
     if (error) throw error;
 
     req.session.user = data.user;
-    res.redirect('/admin/dashboard');
+    res.json({ success: true });
   } catch (error) {
     console.error('Login error:', error);
-    res.render('admin/login', { error: 'Invalid email or password' });
+    res.status(401).json({ success: false, error: 'Invalid email or password' });
   }
+});
+
+// Check authentication
+app.get('/api/admin/check-auth', (req, res) => {
+  res.json({ authenticated: !!req.session.user });
 });
 
 // Admin logout
-app.get('/admin/logout', (req, res) => {
+app.post('/api/admin/logout', (req, res) => {
   req.session.destroy();
-  res.redirect('/admin/login');
+  res.json({ success: true });
 });
 
-// Admin dashboard - List all subjects
-app.get('/admin/dashboard', requireAuth, async (req, res) => {
-  try {
-    const { data: subjects, error } = await supabase
-      .from('subjects')
-      .select('*')
-      .order('name');
-
-    if (error) throw error;
-
-    res.render('admin/dashboard', { 
-      subjects: subjects || [],
-      user: req.session.user 
-    });
-  } catch (error) {
-    console.error('Error fetching subjects:', error);
-    res.render('admin/dashboard', { 
-      subjects: [],
-      user: req.session.user 
-    });
-  }
-});
-
-// Admin - Add subject page
-app.get('/admin/subject/add', requireAuth, (req, res) => {
-  res.render('admin/subject-form', { 
-    subject: null,
-    user: req.session.user 
-  });
-});
-
-// Admin - Add subject POST
-app.post('/admin/subject/add', requireAuth, async (req, res) => {
+// Add subject
+app.post('/api/admin/subject', requireAuth, async (req, res) => {
   try {
     const { name, description } = req.body;
     
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('subjects')
-      .insert([{ name, description }]);
+      .insert([{ name, description }])
+      .select();
 
     if (error) throw error;
 
-    res.redirect('/admin/dashboard');
+    res.json({ success: true, subject: data[0] });
   } catch (error) {
     console.error('Error adding subject:', error);
-    res.redirect('/admin/dashboard');
+    res.status(500).json({ error: 'Failed to add subject' });
   }
 });
 
-// Admin - View subject reviewers
-app.get('/admin/subject/:id/reviewers', requireAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const { data: subject, error: subjectError } = await supabase
-      .from('subjects')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (subjectError) throw subjectError;
-
-    const { data: reviewers, error: reviewersError } = await supabase
-      .from('reviewers')
-      .select('*')
-      .eq('subject_id', id)
-      .order('title');
-
-    if (reviewersError) throw reviewersError;
-
-    res.render('admin/reviewers-list', { 
-      subject,
-      reviewers: reviewers || [],
-      user: req.session.user 
-    });
-  } catch (error) {
-    console.error('Error fetching reviewers:', error);
-    res.redirect('/admin/dashboard');
-  }
-});
-
-// Admin - Delete subject
-app.post('/admin/subject/:id/delete', requireAuth, async (req, res) => {
+// Delete subject
+app.delete('/api/admin/subject/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -294,78 +263,89 @@ app.post('/admin/subject/:id/delete', requireAuth, async (req, res) => {
 
     if (error) throw error;
 
-    res.redirect('/admin/dashboard');
+    res.json({ success: true });
   } catch (error) {
     console.error('Error deleting subject:', error);
-    res.redirect('/admin/dashboard');
+    res.status(500).json({ error: 'Failed to delete subject' });
   }
 });
 
-// Admin - Add reviewer page
-app.get('/admin/subject/:id/reviewer/add', requireAuth, async (req, res) => {
+// Get reviewers for a subject (admin)
+app.get('/api/admin/subject/:id/reviewers', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const { data: subject, error } = await supabase
+    const { data: subject, error: subjectError } = await supabase
       .from('subjects')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (subjectError) throw subjectError;
 
-    res.render('admin/reviewer-form', { 
-      subject,
-      reviewer: null,
-      user: req.session.user 
-    });
+    const { data: reviewers, error: reviewersError } = await supabase
+      .from('reviewers')
+      .select('*')
+      .eq('subject_id', id)
+      .order('title');
+
+    if (reviewersError) throw reviewersError;
+
+    res.json({ subject, reviewers: reviewers || [] });
   } catch (error) {
-    console.error('Error:', error);
-    res.redirect('/admin/dashboard');
+    console.error('Error fetching reviewers:', error);
+    res.status(500).json({ error: 'Failed to fetch reviewers' });
   }
 });
 
-// Admin - Add reviewer POST
-app.post('/admin/subject/:id/reviewer/add', requireAuth, async (req, res) => {
+// Add reviewer
+app.post('/api/admin/reviewer', requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { title, content, quiz } = req.body;
+    const { subject_id, title, content, quiz } = req.body;
     
-    console.log('Adding reviewer - Title:', title);
-    console.log('Adding reviewer - Content length:', content ? content.length : 0);
-    console.log('Adding reviewer - quiz typeof:', typeof quiz);
-    if (quiz && typeof quiz === 'string') console.log('Adding reviewer - quiz (sample):', quiz.substring(0,200));
-
-    const { data: inserted, error: insertError } = await supabase
+    const { data, error } = await supabase
       .from('reviewers')
       .insert([{ 
-        subject_id: id,
+        subject_id,
         title,
         content,
         quiz
       }])
-      .select('id, quiz');
-
-    if (insertError) throw insertError;
-    // Log what was persisted
-    if (inserted && inserted.length) {
-      console.log('Inserted reviewer row quiz typeof:', typeof inserted[0].quiz);
-      try {
-        console.log('Inserted reviewer quiz sample:', (typeof inserted[0].quiz === 'string' ? inserted[0].quiz.substring(0,200) : JSON.stringify(inserted[0].quiz).substring(0,200)));
-      } catch(e) { console.warn('Could not stringify inserted quiz', e); }
-    }
+      .select();
 
     if (error) throw error;
 
-    res.redirect(`/admin/subject/${id}/reviewers`);
+    res.json({ success: true, reviewer: data[0] });
   } catch (error) {
     console.error('Error adding reviewer:', error);
-    res.redirect(`/admin/subject/${id}/reviewers`);
+    res.status(500).json({ error: 'Failed to add reviewer' });
   }
 });
 
-// Admin - Edit reviewer page
-app.get('/admin/reviewer/:id/edit', requireAuth, async (req, res) => {
+// Update reviewer
+app.put('/api/admin/reviewer/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content, quiz } = req.body;
+    
+    const { data, error } = await supabase
+      .from('reviewers')
+      .update({ title, content, quiz })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ success: true, reviewer: data });
+  } catch (error) {
+    console.error('Error updating reviewer:', error);
+    res.status(500).json({ error: 'Failed to update reviewer' });
+  }
+});
+
+// Get reviewer for editing
+app.get('/api/admin/reviewer/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -383,62 +363,18 @@ app.get('/admin/reviewer/:id/edit', requireAuth, async (req, res) => {
 
     if (error) throw error;
 
-    res.render('admin/reviewer-form', { 
-      subject: reviewer.subjects,
-      reviewer,
-      user: req.session.user 
-    });
+    res.json({ reviewer });
   } catch (error) {
     console.error('Error fetching reviewer:', error);
-    res.redirect('/admin/dashboard');
+    res.status(500).json({ error: 'Failed to fetch reviewer' });
   }
 });
 
-// Admin - Edit reviewer POST
-app.post('/admin/reviewer/:id/edit', requireAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, content, quiz } = req.body;
-    
-    console.log('Updating reviewer - Title:', title);
-    console.log('Updating reviewer - Content length:', content ? content.length : 0);
-    console.log('Updating reviewer - quiz typeof:', typeof quiz);
-    if (quiz && typeof quiz === 'string') console.log('Updating reviewer - quiz (sample):', quiz.substring(0,200));
-    
-    const { data, error } = await supabase
-      .from('reviewers')
-      .update({ title, content, quiz })
-      .eq('id', id)
-      .select('subject_id, quiz')
-      .single();
-
-    if (data) {
-      console.log('Post-update reviewer.quiz typeof:', typeof data.quiz);
-      try { console.log('Post-update reviewer.quiz sample:', (typeof data.quiz === 'string' ? data.quiz.substring(0,200) : JSON.stringify(data.quiz).substring(0,200))); } catch(e) {}
-    }
-
-    if (error) throw error;
-
-    res.redirect(`/admin/subject/${data.subject_id}/reviewers`);
-  } catch (error) {
-    console.error('Error updating reviewer:', error);
-    res.redirect('/admin/dashboard');
-  }
-});
-
-// Admin - Delete reviewer
-app.post('/admin/reviewer/:id/delete', requireAuth, async (req, res) => {
+// Delete reviewer
+app.delete('/api/admin/reviewer/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const { data, error: fetchError } = await supabase
-      .from('reviewers')
-      .select('subject_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
     const { error } = await supabase
       .from('reviewers')
       .delete()
@@ -446,57 +382,10 @@ app.post('/admin/reviewer/:id/delete', requireAuth, async (req, res) => {
 
     if (error) throw error;
 
-    res.redirect(`/admin/subject/${data.subject_id}/reviewers`);
+    res.json({ success: true });
   } catch (error) {
     console.error('Error deleting reviewer:', error);
-    res.redirect('/admin/dashboard');
-  }
-});
-
-// Search route - simple text search over subjects and reviewers
-app.get('/search', async (req, res) => {
-  try {
-    const q = (req.query.q || '').trim();
-    if (!q) {
-      return res.render('user/search-results', { query: '', subjects: [], reviewers: [] });
-    }
-
-    // Use ILIKE for case-insensitive partial match
-    const like = `%${q.replace(/%/g, '\\%')}%`;
-
-    // Search subjects by name only
-    const { data: subjects, error: subjectsError } = await supabase
-      .from('subjects')
-      .select('*')
-      .ilike('name', like)
-      .order('name');
-
-    if (subjectsError) throw subjectsError;
-
-    res.render('user/search-results', { query: q, subjects: subjects || [], reviewers: [] });
-  } catch (error) {
-    console.error('Search error:', error);
-    res.render('user/search-results', { query: req.query.q || '', subjects: [], reviewers: [] });
-  }
-});
-
-// API endpoint for typeahead: return subjects matching q as JSON
-app.get('/api/search-subjects', async (req, res) => {
-  try {
-    const q = (req.query.q || '').trim();
-    if (!q) return res.json({ subjects: [] });
-    const like = `%${q.replace(/%/g, '\\%')}%`;
-    const { data: subjects, error } = await supabase
-      .from('subjects')
-      .select('id, name, description')
-      .ilike('name', like)
-      .order('name')
-      .limit(10);
-    if (error) throw error;
-    res.json({ subjects: subjects || [] });
-  } catch (err) {
-    console.error('API search error:', err);
-    res.status(500).json({ subjects: [] });
+    res.status(500).json({ error: 'Failed to delete reviewer' });
   }
 });
 
@@ -506,47 +395,6 @@ if (require.main === module) {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
 }
-
-// Simple quiz view placeholder (shows quiz summary if present)
-app.get('/reviewer/:id/quiz', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { data: reviewer, error } = await supabase
-      .from('reviewers')
-      .select(`*, subjects ( id, name )`)
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    console.log('Fetched reviewer for quiz page - id:', id, 'raw reviewer type:', typeof reviewer);
-    try { console.log('Reviewer.quiz typeof:', reviewer && reviewer.quiz ? typeof reviewer.quiz : 'undefined'); } catch(e) {}
-    // Ensure quiz is parsed if stored as text
-    try {
-      if (reviewer && reviewer.quiz && typeof reviewer.quiz === 'string') {
-        reviewer.quiz = JSON.parse(reviewer.quiz);
-        console.log('Parsed reviewer.quiz for quiz page', id);
-      }
-    } catch (e) {
-      console.warn('Could not parse reviewer.quiz for quiz page', id, e);
-    }
-
-    // If no quiz configured, redirect back
-    if (!reviewer.quiz || !Array.isArray(reviewer.quiz.questions) || reviewer.quiz.questions.length === 0) {
-      return res.redirect(`/reviewer/${id}`);
-    }
-
-    res.render('user/reviewer-quiz', { reviewer, user: req.session.user });
-  } catch (error) {
-    console.error('Error loading quiz page:', error && error.stack ? error.stack : error);
-    // In dev, show the error to the browser to aid debugging. Remove in production.
-    try {
-      res.status(500).send('<h2>Server error loading quiz page</h2><pre>' + (error && error.stack ? error.stack : String(error)) + '</pre>');
-    } catch (e) {
-      // If sending HTML fails, fallback to redirect
-      console.error('Failed to send error response:', e);
-      res.redirect(`/reviewer/${req.params.id}`);
-    }
-  }
-});
 
 // Export app for serverless wrappers and testing
 module.exports = app;
