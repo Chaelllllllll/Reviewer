@@ -54,6 +54,11 @@ app.use(session({
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
+// Serve index.html at root
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Authentication middleware
 const requireAuth = (req, res, next) => {
   if (req.session.user) {
