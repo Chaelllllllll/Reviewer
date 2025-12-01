@@ -1,4 +1,8 @@
-require('dotenv').config();
+// Load environment variables (only in development)
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  require('dotenv').config();
+}
+
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -9,11 +13,19 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+// Initialize Supabase client with error handling
+let supabase;
+try {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+    console.error('Missing SUPABASE_URL or SUPABASE_KEY environment variables');
+  }
+  supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_KEY || ''
+  );
+} catch (error) {
+  console.error('Error initializing Supabase client:', error);
+}
 
 // Middleware
 app.use(bodyParser.json({ limit: '50mb' }));
