@@ -88,6 +88,78 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
     placeholder: 'Write your reviewer content here... You can add text, code blocks, tables, images, and more!'
   });
+
+  // Intercept paste to perform reliable auto-conversion (headers, bullets, bold)
+  quill.root.addEventListener('paste', (e) => {
+    try {
+      const clipboardData = (e.clipboardData || window.clipboardData);
+      const text = clipboardData.getData('text/plain');
+      if (!text) return; // allow default if no plain text
+      e.preventDefault();
+
+      const sel = quill.getSelection(true);
+      let insertIndex = sel ? sel.index : quill.getLength();
+
+      const lines = text.split(/\r?\n/);
+      // Insert each line with formatting
+      lines.forEach((rawLine, lineIdx) => {
+        const line = rawLine.replace(/\t/g, '    ');
+        const trimmed = line.trimStart();
+        const leadingSpaces = line.length - line.replace(/^\s+/, '').length;
+
+        const isHeader = trimmed.startsWith('### ');
+        const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('* ');
+        // compute content without marker
+        let content = line;
+        if (isHeader) content = line.replace(/^(\s*)###\s+/, '$1');
+        else if (isBullet) content = line.replace(/^(\s*)[-*]\s+/, '$1');
+
+        // Insert inline text handling bold markers
+        const boldRegex = /\*\*(.+?)\*\*/g;
+        let lastIndex = 0;
+        let m;
+        while ((m = boldRegex.exec(content)) !== null) {
+          const before = content.slice(lastIndex, m.index);
+          if (before) {
+            quill.insertText(insertIndex, before, {}, 'api');
+            insertIndex += before.length;
+          }
+          const boldText = m[1] || '';
+          if (boldText) {
+            quill.insertText(insertIndex, boldText, { bold: true }, 'api');
+            insertIndex += boldText.length;
+          }
+          lastIndex = m.index + m[0].length;
+        }
+        const tail = content.slice(lastIndex);
+        if (tail) {
+          quill.insertText(insertIndex, tail, {}, 'api');
+          insertIndex += tail.length;
+        }
+
+        // Insert newline and apply block formats
+        // For the last line, don't force an extra newline if original didn't have trailing newline
+        const addNewline = (lineIdx < lines.length - 1);
+        if (addNewline) {
+          quill.insertText(insertIndex, '\n', {}, 'api');
+          // apply block formatting to the line we just inserted
+          const lineStart = insertIndex - (content.length);
+          if (isHeader) {
+            try { quill.formatLine(lineStart, 1, { header: 3 }, 'api'); } catch (e) {}
+          } else if (isBullet) {
+            try { quill.formatLine(lineStart, 1, { list: 'bullet' }, 'api'); } catch (e) {}
+          }
+          insertIndex += 1; // account for newline
+        }
+      });
+
+      // move cursor to end of inserted content
+      quill.setSelection(insertIndex, 0, 'api');
+    } catch (err) {
+      console.error('Paste handler error', err);
+      // fallback: allow default paste
+    }
+  });
   
 
   
@@ -101,7 +173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-  // Markdown-like shortcuts: convert leading '### ' to header and '- ' to bullet list
+  // Markdown-like shortcuts: convert leading '### ' to header, '- ' to bullet list, and '**bold**' to bold
   quill.on('text-change', (delta, oldDelta, source) => {
     if (source !== 'user') return;
 
@@ -115,7 +187,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!sel) return;
     let insertStart = Math.max(0, sel.index - totalInsertedLen);
 
-    // Collect actions to perform (pos, markerLen, type)
+    // Collect actions to perform
+    // header/list actions: {pos, markerLen, kind:'header'|'list', attr}
+    // bold actions: {pos, innerLen, kind:'bold'}
     const actions = [];
     let pointer = insertStart;
     for (const op of insertedOps) {
@@ -133,6 +207,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           const markerPos = pointer + localOffset + leadingSpaces;
           actions.push({ pos: markerPos, markerLen: 2, kind: 'list', attr: { list: 'bullet' } });
         }
+
+        // detect bold **text** in this line
+        const boldRegex = /\*\*(.+?)\*\*/g;
+        let boldMatch;
+        while ((boldMatch = boldRegex.exec(line)) !== null) {
+          const matchIndex = boldMatch.index;
+          const inner = boldMatch[1] || '';
+          const matchPos = pointer + localOffset + matchIndex;
+          actions.push({ kind: 'bold', pos: matchPos, innerLen: inner.length });
+        }
+
         // advance localOffset by length of this part plus the newline (except last)
         localOffset += line.length + 1; // +1 for the '\n' that was removed by split
       }
@@ -145,12 +230,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     actions.sort((a, b) => b.pos - a.pos);
     for (const act of actions) {
       try {
-        // remove marker
-        quill.deleteText(act.pos, act.markerLen, 'api');
-        // apply block format to the line (formatLine uses index & length; using 1 to target the line)
-        quill.formatLine(act.pos, 1, act.attr, 'api');
+        if (act.kind === 'header' || act.kind === 'list') {
+          // remove marker (e.g., '### ' or '- ')
+          quill.deleteText(act.pos, act.markerLen, 'api');
+          // format the line at that position (formatLine with length 1 targets the line)
+          try {
+            quill.formatLine(act.pos, 1, act.attr, 'api');
+          } catch (e) {
+            quill.formatLine(Math.max(0, act.pos - 1), 1, act.attr, 'api');
+          }
+        } else if (act.kind === 'bold') {
+          // act.pos points to the start of the '**' marker
+          const leadingMarkerPos = act.pos;
+          const trailingMarkerPos = act.pos + 2 + act.innerLen; // position of trailing '**'
+          // delete trailing markers first
+          quill.deleteText(trailingMarkerPos, 2, 'api');
+          // delete leading markers
+          quill.deleteText(leadingMarkerPos, 2, 'api');
+          // apply bold to inner text (now starts at leadingMarkerPos)
+          quill.formatText(leadingMarkerPos, act.innerLen, { bold: true }, 'api');
+        }
       } catch (err) {
-        console.warn('Preview shortcut action failed', err, act);
+        console.warn('Shortcut action failed', err, act);
       }
     }
   });
