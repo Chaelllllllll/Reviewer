@@ -23,6 +23,7 @@ async function loadReviewer() {
     }
 
     const header = document.getElementById('reviewerHeader');
+    const currentViewers = (reviewer.view_count !== undefined && reviewer.view_count !== null) ? parseInt(reviewer.view_count) : 0;
     header.innerHTML = `
       <h1 class="text-pink mb-2">
         ${escapeHtml(reviewer.title)}
@@ -30,7 +31,37 @@ async function loadReviewer() {
       <p class="text-muted mb-0">
         <i class="bi bi-folder"></i> ${escapeHtml(reviewer.subjects?.title || 'Unknown Subject')}
       </p>
+      <div class="small text-muted mt-2" id="viewerCount">👁️ ${currentViewers} views</div>
     `;
+
+    // increment view count (optimistic local increment)
+    try {
+      // Update DB: read-modify-write. This may have race conditions but works for light load.
+      await supabase
+        .from('reviewers')
+        .update({ view_count: currentViewers + 1 })
+        .eq('id', reviewerId);
+      // update displayed count immediately
+      const vcEl = document.getElementById('viewerCount');
+      if (vcEl) vcEl.textContent = `👁️ ${currentViewers + 1} views`;
+    } catch (incErr) {
+      console.warn('Failed to increment view_count', incErr);
+    }
+
+    // subscribe to realtime changes for this reviewer to update view count live
+    try {
+      const channel = supabase.channel(`public:reviewers:id=eq.${reviewerId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'reviewers', filter: `id=eq.${reviewerId}` }, (payload) => {
+          const newRow = payload.new || payload.record || null;
+          if (newRow && typeof newRow.view_count !== 'undefined') {
+            const vc = document.getElementById('viewerCount');
+            if (vc) vc.textContent = `👁️ ${newRow.view_count} views`;
+          }
+        })
+        .subscribe();
+    } catch (subErr) {
+      console.warn('Realtime subscription failed', subErr);
+    }
 
     const content = document.getElementById('reviewerContent');
     content.innerHTML = reviewer.content || '<p class="text-muted">No content available.</p>';
