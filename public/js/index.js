@@ -29,12 +29,12 @@ async function loadSubjects() {
       <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100">
           <div class="card-header" style="background-color: ${subject.color || '#FFD4E5'};">
-            <h5 class="mb-0">
-              <i class="bi bi-book"></i>${escapeHtml(subject.title)}
+            <h5 class="mb-0 text-white">
+              <i class="bi bi-book"></i> ${escapeHtml(subject.title)}
             </h5>
           </div>
           <div class="card-body d-flex flex-column">
-            <p class="card-text flex-grow-1">${escapeHtml(subject.description || 'No description available')}</p>
+            <p class="card-text flex-grow-1">${escapeHtml(subject.description || 'No description available.')}</p>
             <a href="/subject.html?id=${subject.id}" class="btn btn-pink w-100 mt-3">
               <i class="bi bi-eye"></i> View Reviewers
             </a>
