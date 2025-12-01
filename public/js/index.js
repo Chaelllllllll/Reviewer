@@ -1,62 +1,107 @@
-// In-memory cache of subjects for filtering
-let allSubjects = [];
+// In-memory cache of courses for filtering
+let allCourses = [];
 
-// Load and display all subjects
-async function loadSubjects() {
+// Load and display all courses with their subjects
+async function loadCourses() {
   try {
-    const { data: subjects, error } = await supabase
-      .from('subjects')
-      .select('*')
+    const { data: courses, error } = await supabase
+      .from('courses')
+      .select(`
+        *,
+        subjects (
+          id,
+          title,
+          description,
+          color
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    const container = document.getElementById('subjectsContainer');
+    const container = document.getElementById('coursesContainer');
     const spinner = document.getElementById('loadingSpinner');
     
     spinner.style.display = 'none';
 
-    // cache subjects for search
-    allSubjects = subjects || [];
+    // cache courses for search
+    allCourses = courses || [];
 
     // initialize search handlers
-    initSubjectSearch();
+    initCourseSearch();
 
-    if (!subjects || subjects.length === 0) {
+    if (!courses || courses.length === 0) {
       container.innerHTML = `
         <div class="col-12 text-center py-5">
           <i class="bi bi-inbox" style="font-size: 4rem; color: var(--pink-primary);"></i>
-          <h3 class="mt-3 text-muted">No subjects available yet</h3>
+          <h3 class="mt-3 text-muted">No courses available yet</h3>
           <p class="text-muted">Check back later for new content!</p>
         </div>
       `;
       return;
     }
 
-    // Create subject cards
-    container.innerHTML = subjects.map(subject => `
-      <div class="col-md-6 col-lg-4 mb-4">
-        <div class="card h-100">
-          <div class="card-header" style="background-color: ${subject.color || '#FFD4E5'};">
-            <h5 class="mb-0 text-white">
-              <i class="bi bi-book"></i> ${escapeHtml(subject.title)}
-            </h5>
+    // Create course cards with collapsible subjects
+    container.innerHTML = courses.map(course => {
+      const subjects = course.subjects || [];
+      const subjectCount = subjects.length;
+      
+      return `
+      <div class="col-12 mb-4">
+        <div class="card">
+          <div class="card-header" style="background-color: ${course.color || '#fd77ad'};">
+            <div class="d-flex justify-content-between align-items-center">
+              <h4 class="mb-0 text-white">
+                <i class="bi bi-collection-fill"></i> ${escapeHtml(course.title)}
+              </h4>
+              <button 
+                class="btn btn-light btn-sm" 
+                type="button"
+                data-bs-toggle="collapse" 
+                data-bs-target="#course-${course.id}" 
+                aria-expanded="false"
+              > View Subjects (${subjectCount})
+              </button>
+            </div>
+            ${course.description ? `<p class="mb-0 mt-2 text-white small">${escapeHtml(course.description)}</p>` : ''}
           </div>
-          <div class="card-body d-flex flex-column">
-            <p class="card-text flex-grow-1">${escapeHtml(subject.description || 'No description available.')}</p>
-            <a href="/subject.html?id=${subject.id}" class="btn btn-pink w-100 mt-3">
-              <i class="bi bi-eye"></i> View Reviewers
-            </a>
+          <div class="collapse" id="course-${course.id}">
+            <div class="card-body">
+              ${subjects.length > 0 ? `
+                <div class="row">
+                  ${subjects.map(subject => `
+                    <div class="col-md-6 col-lg-4 mb-3">
+                      <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-header" style="background-color: ${subject.color || '#fd77ad'};">
+                          <h6 class="mb-0 text-white">
+                            <i class="bi bi-book"></i> ${escapeHtml(subject.title)}
+                          </h6>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                          <p class="card-text flex-grow-1 small">${escapeHtml(subject.description || 'No description available.')}</p>
+                          <a href="/subject.html?id=${subject.id}" class="btn btn-pink btn-sm w-100 mt-2 text-light">
+                            <i class="bi bi-eye"></i> View Reviewers
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : `
+                <div class="text-center py-4 text-muted">
+                  <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                  <p class="mt-2 mb-0">No subjects in this course yet</p>
+                </div>
+              `}
+            </div>
           </div>
         </div>
       </div>
-    `).join('');
-
-    // If there are no subjects, still show the no-results UI handled above
+    `}).join('');
 
   } catch (error) {
-    console.error('Error loading subjects:', error);
-    const container = document.getElementById('subjectsContainer');
+    console.error('Error loading courses:', error);
+    const container = document.getElementById('coursesContainer');
     const spinner = document.getElementById('loadingSpinner');
     
     spinner.style.display = 'none';
@@ -64,7 +109,7 @@ async function loadSubjects() {
       <div class="col-12">
         <div class="alert alert-danger" role="alert">
           <i class="bi bi-exclamation-triangle-fill"></i> 
-          Failed to load subjects. Please try again later.
+          Failed to load courses. Please try again later.
         </div>
       </div>
     `;
@@ -78,12 +123,12 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Load subjects when page loads
-document.addEventListener('DOMContentLoaded', loadSubjects);
+// Load courses when page loads
+document.addEventListener('DOMContentLoaded', loadCourses);
 
 // Initialize search input behavior
-function initSubjectSearch() {
-  const searchEl = document.getElementById('subjectSearch');
+function initCourseSearch() {
+  const searchEl = document.getElementById('courseSearch');
   const clearBtn = document.getElementById('clearSearch');
   if (!searchEl) return;
 
@@ -94,7 +139,7 @@ function initSubjectSearch() {
     if (clearBtn) clearBtn.style.display = q ? 'inline-block' : 'none';
     if (t) clearTimeout(t);
     t = setTimeout(() => {
-      filterSubjects(q);
+      filterCourses(q);
     }, 180);
   });
 
@@ -102,47 +147,93 @@ function initSubjectSearch() {
     clearBtn.addEventListener('click', () => {
       searchEl.value = '';
       clearBtn.style.display = 'none';
-      filterSubjects('');
+      filterCourses('');
       searchEl.focus();
     });
   }
 }
 
-function filterSubjects(q) {
-  const container = document.getElementById('subjectsContainer');
+function filterCourses(q) {
+  const container = document.getElementById('coursesContainer');
   if (!container) return;
-  const items = allSubjects.filter(s => {
+  
+  const items = allCourses.filter(c => {
     if (!q) return true;
-    const hay = `${s.title} ${s.description || ''}`.toLowerCase();
-    return hay.indexOf(q) !== -1;
+    const hay = `${c.title} ${c.description || ''}`.toLowerCase();
+    // Also search in subjects
+    const subjectMatch = (c.subjects || []).some(s => {
+      const subHay = `${s.title} ${s.description || ''}`.toLowerCase();
+      return subHay.indexOf(q) !== -1;
+    });
+    return hay.indexOf(q) !== -1 || subjectMatch;
   });
 
   if (!items || items.length === 0) {
     container.innerHTML = `
       <div class="col-12 text-center py-5">
         <i class="bi bi-search" style="font-size: 4rem; color: var(--pink-primary);"></i>
-        <h3 class="mt-3 text-muted">No matching subjects</h3>
+        <h3 class="mt-3 text-muted">No matching courses</h3>
         <p class="text-muted">Try a different search term.</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = items.map(subject => `
-    <div class="col-md-6 col-lg-4 mb-4">
-      <div class="card h-100">
-        <div class="card-header" style="background-color: ${subject.color || '#FFD4E5'};">
-          <h5 class="mb-0 text-white">
-            <i class="bi bi-book"></i> ${escapeHtml(subject.title)}
-          </h5>
+  container.innerHTML = items.map(course => {
+    const subjects = course.subjects || [];
+    const subjectCount = subjects.length;
+    
+    return `
+    <div class="col-12 mb-4">
+      <div class="card">
+        <div class="card-header" style="background-color: ${course.color || '#fd77ad'};">
+          <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0 text-white">
+              <i class="bi bi-collection-fill"></i> ${escapeHtml(course.title)}
+            </h4>
+            <button 
+              class="btn btn-light btn-sm" 
+              type="button" 
+              data-bs-toggle="collapse" 
+              data-bs-target="#course-${course.id}" 
+              aria-expanded="false"
+            >
+              <i class="bi bi-eye"></i> View Subjects (${subjectCount})
+            </button>
+          </div>
+          ${course.description ? `<p class="mb-0 mt-2 text-white small">${escapeHtml(course.description)}</p>` : ''}
         </div>
-        <div class="card-body d-flex flex-column">
-          <p class="card-text flex-grow-1">${escapeHtml(subject.description || 'No description available.')}</p>
-          <a href="/subject.html?id=${subject.id}" class="btn btn-pink w-100 mt-3">
-            <i class="bi bi-eye"></i> View Reviewers
-          </a>
+        <div class="collapse" id="course-${course.id}">
+          <div class="card-body">
+            ${subjects.length > 0 ? `
+              <div class="row">
+                ${subjects.map(subject => `
+                  <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100 border-0 shadow-sm">
+                      <div class="card-header" style="background-color: ${subject.color || '#fd77ad'};">
+                        <h6 class="mb-0 text-white">
+                          <i class="bi bi-book"></i> ${escapeHtml(subject.title)}
+                        </h6>
+                      </div>
+                      <div class="card-body d-flex flex-column">
+                        <p class="card-text flex-grow-1 small">${escapeHtml(subject.description || 'No description available.')}</p>
+                        <a href="/subject.html?id=${subject.id}" class="btn btn-pink btn-sm w-100 mt-2 text-light">
+                          <i class="bi bi-eye"></i> View Reviewers
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                <p class="mt-2 mb-0">No subjects in this course yet</p>
+              </div>
+            `}
+          </div>
         </div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }

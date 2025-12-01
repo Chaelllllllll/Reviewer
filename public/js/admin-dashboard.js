@@ -1,15 +1,15 @@
-let subjectModal;
+let courseModal;
 let deleteModal;
-let deleteSubjectId = null;
+let deleteCourseId = null;
 
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', async () => {
   await checkAuth();
   
-  subjectModal = new bootstrap.Modal(document.getElementById('subjectModal'));
+  courseModal = new bootstrap.Modal(document.getElementById('courseModal'));
   deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
   
-  loadSubjects();
+  loadCourses();
 });
 
 // Handle logout
@@ -18,102 +18,107 @@ async function handleLogout() {
   window.location.href = '/admin/login.html';
 }
 
-// Load all subjects
-async function loadSubjects() {
+// Load all courses with subject counts
+async function loadCourses() {
   try {
-    const { data: subjects, error } = await supabase
-      .from('subjects')
-      .select('*')
+    const { data: courses, error } = await supabase
+      .from('courses')
+      .select(`
+        *,
+        subjects (count)
+      `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     const spinner = document.getElementById('loadingSpinner');
-    const table = document.getElementById('subjectsTable');
-    const noSubjects = document.getElementById('noSubjects');
-    const tbody = document.getElementById('subjectsTableBody');
+    const table = document.getElementById('coursesTable');
+    const noCourses = document.getElementById('noCourses');
+    const tbody = document.getElementById('coursesTableBody');
 
     spinner.style.display = 'none';
 
-    if (!subjects || subjects.length === 0) {
-      noSubjects.style.display = 'block';
+    if (!courses || courses.length === 0) {
+      noCourses.style.display = 'block';
       return;
     }
 
     table.style.display = 'block';
     
-    tbody.innerHTML = subjects.map(subject => `
+    tbody.innerHTML = courses.map(course => {
+      const subjectCount = course.subjects?.[0]?.count || 0;
+      
+      return `
       <tr>
         <td>
           <div class="d-flex align-items-center">
-            <div style="width: 20px; height: 20px; background-color: ${subject.color}; border-radius: 5px; margin-right: 10px;"></div>
-            <strong>${escapeHtml(subject.title)}</strong>
+              <div style="width: 20px; height: 20px; background-color: ${course.color || '#fd77ad'}; border-radius: 5px; margin-right: 10px;"></div>
+            <strong>${escapeHtml(course.title)}</strong>
           </div>
         </td>
-        <td>${escapeHtml(subject.description || '-')}</td>
-        <td>${new Date(subject.created_at).toLocaleDateString()}</td>
+        <td>${escapeHtml(course.description || '-')}</td>
+        <td><span class="badge bg-pink text-dark">${subjectCount} subject${subjectCount !== 1 ? 's' : ''}</span></td>
+        <td>${new Date(course.created_at).toLocaleDateString()}</td>
         <td class="text-end">
           <div class="btn-group" role="group">
-            <a href="/admin/subject-reviewers.html?id=${subject.id}" class="btn btn-sm btn-outline-pink">
-              <i class="bi bi-eye"></i> View
+            <a href="/admin/course-subjects.html?id=${course.id}" class="btn btn-sm btn-outline-pink">
+              <i class="bi bi-eye"></i> View Subjects
             </a>
-            <button class="btn btn-sm btn-outline-pink" onclick="editSubject('${subject.id}')">
+            <button class="btn btn-sm btn-outline-pink" onclick="editCourse('${course.id}')">
               <i class="bi bi-pencil"></i> Edit
             </button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteSubject('${subject.id}')">
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteCourse('${course.id}')">
               <i class="bi bi-trash"></i> Delete
             </button>
           </div>
         </td>
       </tr>
-    `).join('');
+    `}).join('');
 
   } catch (error) {
-    console.error('Error loading subjects:', error);
-    alert('Failed to load subjects. Please refresh the page.');
+    console.error('Error loading courses:', error);
+    alert('Failed to load courses. Please refresh the page.');
   }
 }
 
-// Show create subject modal
-function showCreateSubjectModal() {
-  document.getElementById('subjectModalTitle').textContent = 'Create Subject';
-  document.getElementById('subjectForm').reset();
-  document.getElementById('subjectId').value = '';
-  document.getElementById('subjectColor').value = '#FFD4E5';
-  subjectModal.show();
+// Show create course modal
+function showCreateCourseModal() {
+  document.getElementById('courseModalTitle').textContent = 'Create Course';
+  document.getElementById('courseForm').reset();
+  document.getElementById('courseId').value = '';
+  courseModal.show();
 }
 
-// Edit subject
-async function editSubject(id) {
+// Edit course
+async function editCourse(id) {
   try {
-    const { data: subject, error } = await supabase
-      .from('subjects')
+    const { data: course, error } = await supabase
+      .from('courses')
       .select('*')
       .eq('id', id)
       .single();
 
     if (error) throw error;
 
-    document.getElementById('subjectModalTitle').textContent = 'Edit Subject';
-    document.getElementById('subjectId').value = subject.id;
-    document.getElementById('subjectTitle').value = subject.title;
-    document.getElementById('subjectDescription').value = subject.description || '';
-    document.getElementById('subjectColor').value = subject.color || '#FFD4E5';
+    document.getElementById('courseModalTitle').textContent = 'Edit Course';
+    document.getElementById('courseId').value = course.id;
+    document.getElementById('courseTitle').value = course.title;
+    document.getElementById('courseDescription').value = course.description || '';
     
-    subjectModal.show();
+    courseModal.show();
 
   } catch (error) {
-    console.error('Error loading subject:', error);
-    alert('Failed to load subject details.');
+    console.error('Error loading course:', error);
+    alert('Failed to load course details.');
   }
 }
 
-// Save subject (create or update)
-async function saveSubject() {
-  const id = document.getElementById('subjectId').value;
-  const title = document.getElementById('subjectTitle').value.trim();
-  const description = document.getElementById('subjectDescription').value.trim();
-  const color = document.getElementById('subjectColor').value;
+// Save course (create or update)
+async function saveCourse() {
+  const id = document.getElementById('courseId').value;
+  const title = document.getElementById('courseTitle').value.trim();
+  const description = document.getElementById('courseDescription').value.trim();
+  const color = '#fd77ad';
 
   if (!title) {
     alert('Please enter a title');
@@ -124,7 +129,7 @@ async function saveSubject() {
     if (id) {
       // Update
       const { error } = await supabase
-        .from('subjects')
+        .from('courses')
         .update({ title, description, color, updated_at: new Date().toISOString() })
         .eq('id', id);
 
@@ -132,46 +137,46 @@ async function saveSubject() {
     } else {
       // Create
       const { error } = await supabase
-        .from('subjects')
+        .from('courses')
         .insert([{ title, description, color }]);
 
       if (error) throw error;
     }
 
-    subjectModal.hide();
-    loadSubjects();
+    courseModal.hide();
+    loadCourses();
 
   } catch (error) {
-    console.error('Error saving subject:', error);
-    alert('Failed to save subject. Please try again.');
+    console.error('Error saving course:', error);
+    alert('Failed to save course. Please try again.');
   }
 }
 
-// Delete subject
-function deleteSubject(id) {
-  deleteSubjectId = id;
+// Delete course
+function deleteCourse(id) {
+  deleteCourseId = id;
   deleteModal.show();
 }
 
 // Confirm delete
 async function confirmDelete() {
-  if (!deleteSubjectId) return;
+  if (!deleteCourseId) return;
 
   try {
     const { error } = await supabase
-      .from('subjects')
+      .from('courses')
       .delete()
-      .eq('id', deleteSubjectId);
+      .eq('id', deleteCourseId);
 
     if (error) throw error;
 
     deleteModal.hide();
-    deleteSubjectId = null;
-    loadSubjects();
+    deleteCourseId = null;
+    loadCourses();
 
   } catch (error) {
-    console.error('Error deleting subject:', error);
-    alert('Failed to delete subject. Please try again.');
+    console.error('Error deleting course:', error);
+    alert('Failed to delete course. Please try again.');
   }
 }
 
