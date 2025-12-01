@@ -7,6 +7,7 @@ let questionModal;
 let quizQuestions = [];
 let currentQuestionIndex = null;
 let optionCounter = 2;
+let importModal;
 
 // Helpers to parse options and normalize correct answers
 function parseOptions(raw) {
@@ -59,6 +60,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkAuth();
   
   questionModal = new bootstrap.Modal(document.getElementById('questionModal'));
+  importModal = new bootstrap.Modal(document.getElementById('importModal'));
+  const importFileEl = document.getElementById('importFile');
+  if (importFileEl) importFileEl.addEventListener('change', (e) => {
+    const preview = document.getElementById('importPreview');
+    if (preview) preview.textContent = `Selected file: ${importFileEl.files && importFileEl.files.length ? importFileEl.files[0].name : ''}`;
+  });
   
   // Initialize Quill editor
   quill = new Quill('#editor', {
@@ -446,6 +453,115 @@ function renderQuizQuestions() {
       </div>
     </div>
   `).join('');
+}
+
+// Import helpers
+function showImportModal() {
+  // clear inputs
+  const fileEl = document.getElementById('importFile');
+  const textEl = document.getElementById('importText');
+  const preview = document.getElementById('importPreview');
+  if (fileEl) fileEl.value = '';
+  if (textEl) textEl.value = '';
+  if (preview) preview.textContent = '';
+  importModal.show();
+}
+
+function parseCSV(text) {
+  // very small CSV parser: assumes first line is header, comma separated
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return [];
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = lines.slice(1).map(line => {
+    // naive split - does not handle quoted commas
+    const cols = line.split(',').map(c => c.trim());
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = cols[i] ?? '');
+    return obj;
+  });
+  return rows;
+}
+
+function parseImportContent(content, filename) {
+  // try JSON first
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) return parsed;
+    // if object with data property
+    if (parsed && parsed.data && Array.isArray(parsed.data)) return parsed.data;
+  } catch (e) {
+    // not JSON
+  }
+
+  // fallback to CSV
+  return parseCSV(content);
+}
+
+async function handleImport() {
+  const fileEl = document.getElementById('importFile');
+  const textEl = document.getElementById('importText');
+  const replace = document.getElementById('importReplace')?.checked;
+  const preview = document.getElementById('importPreview');
+
+  let content = '';
+  let filename = '';
+  if (fileEl && fileEl.files && fileEl.files.length) {
+    const file = fileEl.files[0];
+    filename = file.name;
+    content = await file.text();
+  } else if (textEl && textEl.value.trim()) {
+    content = textEl.value.trim();
+  } else {
+    alert('Please provide a file or paste content to import');
+    return;
+  }
+
+  let items = [];
+  try {
+    items = parseImportContent(content, filename);
+  } catch (err) {
+    console.error('Import parse error', err);
+    alert('Failed to parse import data. Check format.');
+    return;
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    alert('No questions found in import content');
+    return;
+  }
+
+  // Map imported rows to quiz question objects
+  const imported = items.map((it, idx) => {
+    // support rows where fields may be strings
+    const question = (it.question || it.q || it.question_text || '') + '';
+    const type = (it.type || 'multiple_choice') + '';
+    let optionsRaw = it.options ?? it.opts ?? '';
+    // if options field is an array already, keep
+    const options = parseOptions(optionsRaw);
+    let correct = it.correct_answer ?? it.correct ?? it.answer ?? '';
+    // normalize correct to index
+    const correctIdx = normalizeCorrectAnswer(correct, options);
+    const points = parseInt(it.points) || 1;
+    const order_index = (it.order_index !== undefined) ? parseInt(it.order_index) : idx;
+
+    return {
+      question: question,
+      type: type,
+      options: type === 'multiple_choice' ? options : undefined,
+      correct_answer: type === 'multiple_choice' ? correctIdx : (it.sample_answer || ''),
+      points: points,
+      order_index: order_index
+    };
+  });
+
+  if (replace) {
+    quizQuestions = imported;
+  } else {
+    quizQuestions = quizQuestions.concat(imported);
+  }
+
+  renderQuizQuestions();
+  importModal.hide();
 }
 
 // Format question type

@@ -119,7 +119,7 @@ function renderQuiz() {
     container.innerHTML = quizData.map((q, idx) => {
       try {
         return `
-          <div class="mb-4">
+          <div class="mb-4" data-qidx="${idx}">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <h5 class="mb-0">Question ${idx+1}</h5>
               <span class="badge bg-light text-pink">${q.points} ${q.points==1? 'pt':'pts'}</span>
@@ -138,6 +138,16 @@ function renderQuiz() {
         `;
       }
     }).join('');
+
+    // ensure validation message placeholder exists
+    let validationEl = document.getElementById('quizValidation');
+    if (!validationEl) {
+      validationEl = document.createElement('div');
+      validationEl.id = 'quizValidation';
+      validationEl.className = 'mb-3';
+      const actionsContainer = document.getElementById('quizActions');
+      actionsContainer.parentNode.insertBefore(validationEl, actionsContainer);
+    }
 
     document.getElementById('quizActions').style.display = 'block';
     document.getElementById('submitBtn').onclick = submitQuiz;
@@ -199,6 +209,37 @@ async function submitQuiz() {
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Grading...';
   
+  // Clear previous validation highlights
+  document.querySelectorAll('[data-qidx]').forEach(el => el.classList.remove('question-missing'));
+  const validationEl = document.getElementById('quizValidation');
+  if (validationEl) validationEl.innerHTML = '';
+
+  // Validate required answers
+  const missing = [];
+  quizData.forEach((q, idx) => {
+    if (q.type === 'multiple_choice') {
+      if (userAnswers[idx] === undefined || userAnswers[idx] === null || userAnswers[idx] === '') missing.push(idx);
+    } else if (q.type === 'short_answer' || q.type === 'long_answer') {
+      const val = userAnswers[idx];
+      if (!val || String(val).trim() === '') missing.push(idx);
+    }
+  });
+
+  if (missing.length > 0) {
+    // mark missing questions
+    missing.forEach(i => {
+      const el = document.querySelector(`[data-qidx="${i}"]`);
+      if (el) el.classList.add('question-missing');
+    });
+    // show validation message and scroll to first missing
+    const first = document.querySelector(`[data-qidx="${missing[0]}"]`);
+    if (validationEl) validationEl.innerHTML = `<div class="alert alert-danger">Please answer all required questions. ${missing.length} unanswered.</div>`;
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> Submit Quiz';
+    return;
+  }
+
   try {
     // Try server-side grading first
     const { data, error } = await supabase.functions.invoke('grade-quiz', {

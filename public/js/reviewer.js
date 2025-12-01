@@ -40,7 +40,7 @@ async function loadReviewer() {
     if (actions) {
       actions.style.display = 'block';
       actions.innerHTML = `
-        <button class="btn btn-pink me-2" onclick="downloadPdf()">
+        <button class="btn btn-pink me-2 text-white" onclick="downloadPdf()">
           <i class="bi bi-file-earmark-arrow-down"></i> Download as PDF
         </button>
         <button class="btn btn-outline-pink" onclick="goToQuiz()">
