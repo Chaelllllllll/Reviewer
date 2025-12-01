@@ -8,6 +8,52 @@ let quizQuestions = [];
 let currentQuestionIndex = null;
 let optionCounter = 2;
 
+// Helpers to parse options and normalize correct answers
+function parseOptions(raw) {
+  try {
+    if (Array.isArray(raw)) {
+      // If it's already an array, check if elements need parsing
+      return raw.map(item => {
+        if (typeof item === 'string' && (item.startsWith('[') || item.startsWith('{'))) {
+          try {
+            const parsed = JSON.parse(item);
+            return Array.isArray(parsed) ? parsed : item;
+          } catch (e) {
+            return item;
+          }
+        }
+        return item;
+      }).flat(); // Flatten in case any elements were arrays
+    }
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch (e) {
+        return raw.split(/\r?\n|\|/).map(s => s.trim()).filter(Boolean);
+      }
+    }
+    if (typeof raw === 'object') {
+      return Object.values(raw).map(v => (v && v.text) ? v.text : v);
+    }
+    return [String(raw)];
+  } catch (err) {
+    console.warn('parseOptions failed', err, raw);
+    return [];
+  }
+}
+
+function normalizeCorrectAnswer(correct, optionsArr) {
+  if (typeof correct === 'number') return correct;
+  if (typeof correct === 'string' && /^\d+$/.test(correct)) return parseInt(correct);
+  if (typeof correct === 'string') {
+    const idx = optionsArr.findIndex(o => String(o) === correct);
+    if (idx !== -1) return idx;
+  }
+  return correct;
+}
+
 // Check authentication and initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await checkAuth();
@@ -80,7 +126,15 @@ async function loadReviewer() {
       .order('order_index', { ascending: true });
 
     if (!quizError && quizzes) {
-      quizQuestions = quizzes;
+      // Normalize options and correct_answer for each quiz item
+      quizQuestions = quizzes.map(q => {
+        const opts = parseOptions(q.options);
+        return {
+          ...q,
+          options: opts,
+          correct_answer: normalizeCorrectAnswer(q.correct_answer, opts)
+        };
+      });
       renderQuizQuestions();
     }
 
@@ -212,7 +266,8 @@ function editQuestion(index) {
   if (question.type === 'multiple_choice') {
     resetOptions();
     const optionsContainer = document.getElementById('optionsContainer');
-    optionsContainer.innerHTML = question.options.map((opt, idx) => `
+    const opts = Array.isArray(question.options) ? question.options : [];
+    optionsContainer.innerHTML = opts.map((opt, idx) => `
       <div class="option-input">
         <input type="radio" name="correctOption" value="${idx}" ${question.correct_answer == idx ? 'checked' : ''}>
         <input type="text" class="form-control" placeholder="Option ${idx + 1}" data-option-index="${idx}" value="${escapeHtml(opt)}">
@@ -221,7 +276,7 @@ function editQuestion(index) {
         </button>
       </div>
     `).join('');
-    optionCounter = question.options.length;
+    optionCounter = opts.length;
   } else {
     document.getElementById('sampleAnswer').value = question.correct_answer || '';
   }
@@ -367,7 +422,7 @@ function renderQuizQuestions() {
           
           ${q.type === 'multiple_choice' ? `
             <div class="ms-3">
-              ${q.options.map((opt, optIdx) => `
+              ${(Array.isArray(q.options) ? q.options : []).map((opt, optIdx) => `
                 <div class="${optIdx == q.correct_answer ? 'text-success fw-bold' : ''}">
                   ${optIdx == q.correct_answer ? '✓' : '○'} ${escapeHtml(opt)}
                 </div>

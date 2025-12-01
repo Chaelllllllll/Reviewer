@@ -37,6 +37,19 @@
       border: 2px solid var(--pink-light);
       border-bottom: none;
     }
+
+    /* Keep the Quill toolbar visible while scrolling */
+    .ql-toolbar {
+      position: -webkit-sticky;
+      position: sticky;
+      top: 70px; /* sit below the navbar */
+      z-index: 1050; /* above page content */
+    }
+
+    /* Prevent toolbar from overlapping editor content when sticky */
+    .ql-toolbar + .ql-container {
+      margin-top: 0;
+    }
     
     .ql-container {
       border-radius: 0 0 10px 10px;
