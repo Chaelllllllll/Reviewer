@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
+const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -19,11 +21,32 @@ const supabase = createClient(
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
+
+// Use Postgres-backed session store in production instead of the default MemoryStore
+// Requires a DATABASE_URL env var pointing to your Postgres connection string (e.g. Supabase DB URL)
+// If you don't have DATABASE_URL, set it in your Vercel/Render environment variables.
+const databaseUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || null;
+let sessionStore = null;
+if (databaseUrl) {
+  // Create a pg pool; connect-pg-simple will use this pool
+  const pgPool = new Pool({ connectionString: databaseUrl });
+  sessionStore = new pgSession({ pool: pgPool, tableName: 'session', createTableIfMissing: true });
+  // If behind a proxy (e.g., Vercel), trust first proxy
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
+}
+
 app.use(session({
-  secret: 'reviewer-secret-key-change-in-production',
+  store: sessionStore || undefined,
+  secret: process.env.SESSION_SECRET || 'reviewer-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
