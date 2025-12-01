@@ -30,7 +30,7 @@ async function loadSubjects() {
         <div class="card h-100">
           <div class="card-header" style="background-color: ${subject.color || '#FFD4E5'};">
             <h5 class="mb-0">
-              <i class="bi bi-book"></i> ${escapeHtml(subject.title)}
+              <i class="bi bi-book"></i>${escapeHtml(subject.title)}
             </h5>
           </div>
           <div class="card-body d-flex flex-column">
