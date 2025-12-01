@@ -77,7 +77,7 @@ async function loadReviewers() {
                 </small>
               </div>
               <div class="col-md-3 text-end mt-3 mt-md-0">
-                <a href="/reviewer.html?id=${reviewer.id}" class="btn btn-pink">
+                <a href="/reviewer.html?id=${reviewer.id}" class="btn btn-pink text-light">
                   <i class="bi bi-eye"></i> View
                 </a>
               </div>
