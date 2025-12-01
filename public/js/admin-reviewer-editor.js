@@ -8,6 +8,7 @@ let quizQuestions = [];
 let currentQuestionIndex = null;
 let optionCounter = 2;
 let importModal;
+let previewModal;
 
 // Helpers to parse options and normalize correct answers
 function parseOptions(raw) {
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   questionModal = new bootstrap.Modal(document.getElementById('questionModal'));
   importModal = new bootstrap.Modal(document.getElementById('importModal'));
+  previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
   const importFileEl = document.getElementById('importFile');
   if (importFileEl) importFileEl.addEventListener('change', (e) => {
     const preview = document.getElementById('importPreview');
@@ -87,6 +89,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     placeholder: 'Write your reviewer content here... You can add text, code blocks, tables, images, and more!'
   });
   
+
+  
+  
   if (reviewerId) {
     document.getElementById('pageTitle').innerHTML = '<i class="bi bi-pencil"></i> Edit Reviewer';
     loadReviewer();
@@ -95,6 +100,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/admin/dashboard.html';
   }
 });
+
+  // Markdown-like shortcuts: convert leading '### ' to header and '- ' to bullet list
+  quill.on('text-change', (delta, oldDelta, source) => {
+    if (source !== 'user') return;
+
+    // Gather inserted string ops (handles typing and paste)
+    const insertedOps = (delta.ops || []).filter(op => typeof op.insert === 'string');
+    if (insertedOps.length === 0) return;
+
+    // Compute total inserted length and start index of insertion
+    const totalInsertedLen = insertedOps.reduce((sum, op) => sum + String(op.insert).length, 0);
+    const sel = quill.getSelection();
+    if (!sel) return;
+    let insertStart = Math.max(0, sel.index - totalInsertedLen);
+
+    // Collect actions to perform (pos, markerLen, type)
+    const actions = [];
+    let pointer = insertStart;
+    for (const op of insertedOps) {
+      const text = String(op.insert);
+      const parts = text.split('\n');
+      let localOffset = 0;
+      for (let i = 0; i < parts.length; i++) {
+        const line = parts[i];
+        const trimmed = line.trimStart();
+        const leadingSpaces = line.length - line.replace(/^\s+/, '').length;
+        if (trimmed.startsWith('### ')) {
+          const markerPos = pointer + localOffset + leadingSpaces;
+          actions.push({ pos: markerPos, markerLen: 4, kind: 'header', attr: { header: 3 } });
+        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          const markerPos = pointer + localOffset + leadingSpaces;
+          actions.push({ pos: markerPos, markerLen: 2, kind: 'list', attr: { list: 'bullet' } });
+        }
+        // advance localOffset by length of this part plus the newline (except last)
+        localOffset += line.length + 1; // +1 for the '\n' that was removed by split
+      }
+      pointer += text.length;
+    }
+
+    if (actions.length === 0) return;
+
+    // Apply actions in reverse order to avoid shifting positions
+    actions.sort((a, b) => b.pos - a.pos);
+    for (const act of actions) {
+      try {
+        // remove marker
+        quill.deleteText(act.pos, act.markerLen, 'api');
+        // apply block format to the line (formatLine uses index & length; using 1 to target the line)
+        quill.formatLine(act.pos, 1, act.attr, 'api');
+      } catch (err) {
+        console.warn('Preview shortcut action failed', err, act);
+      }
+    }
+  });
 
 // Handle logout
 async function handleLogout() {
@@ -579,4 +638,53 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Show preview modal with rendered reviewer content and quiz preview
+function showPreviewModal() {
+  const title = document.getElementById('reviewerTitle').value.trim();
+  const contentHtml = quill ? quill.root.innerHTML : '';
+  const container = document.getElementById('previewContent');
+  if (!container) return;
+
+  let html = '';
+  if (title) html += `<h2 class="text-pink">${escapeHtml(title)}</h2>`;
+  html += `<div class="mb-3">${contentHtml}</div>`;
+
+  if (quizQuestions && quizQuestions.length) {
+    html += '<hr><h4>Quiz Preview</h4>';
+    quizQuestions.forEach((q, i) => {
+      html += `<div class="mb-3"><strong>Q${i+1}.</strong> ${escapeHtml(q.question || '')}`;
+      if (q.type === 'multiple_choice') {
+        html += '<div class="ms-3 mt-2">';
+        (Array.isArray(q.options) ? q.options : []).forEach((opt, idx) => {
+          const mark = (q.correct_answer != null && q.correct_answer == idx) ? '✓' : '○';
+          html += `<div>${mark} ${escapeHtml(opt)}</div>`;
+        });
+        html += '</div>';
+      } else if (q.correct_answer) {
+        html += `<div class="ms-3 mt-2"><small class="text-muted">Sample answer: ${escapeHtml(q.correct_answer)}</small></div>`;
+      }
+      html += '</div>';
+    });
+  }
+
+  container.innerHTML = html;
+  previewModal.show();
+}
+
+// Download/print preview as PDF using browser print
+function downloadPreviewPdf() {
+  const content = document.getElementById('previewContent');
+  if (!content) return;
+  const w = window.open('', '_blank');
+  const docHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Preview</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"></head><body class="p-4">${content.innerHTML}</body></html>`;
+  w.document.open();
+  w.document.write(docHtml);
+  w.document.close();
+  w.focus();
+  // give it a moment to render, then print
+  setTimeout(() => {
+    w.print();
+  }, 300);
 }

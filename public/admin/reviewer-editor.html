@@ -90,6 +90,11 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
+            <button class="btn btn-outline-pink me-2" onclick="showPreviewModal()">
+              <i class="bi bi-eye"></i> Preview
+            </button>
+          </li>
+          <li class="nav-item">
             <button class="btn btn-pink me-2" onclick="saveReviewer()">
               <i class="bi bi-save"></i> Save Reviewer
             </button>
@@ -311,6 +316,25 @@
   </div>
 
    <!-- Footer -->
+  <!-- Preview Modal -->
+  <div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Preview Reviewer</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="previewContent" class="prose" style="min-height:200px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-pink" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-pink" onclick="downloadPreviewPdf()">Download as PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     <div class="container d-flex justify-content-between align-items-center">
       <p class="mb-0">&copy; 2025 Thinky. Made with <i class="bi bi-heart-fill text-pink"></i> by <strong>Chael</strong></p>
