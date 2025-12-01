@@ -25,12 +25,32 @@ if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
   app.set('trust proxy', 1);
 }
 
-// Session configuration (cookie-based for serverless compatibility)
-// Note: For production use with multiple serverless instances, consider using:
-// - @vercel/kv with connect-redis, or
-// - Supabase Auth (recommended for auth state management)
-// The warning about MemoryStore can be ignored in serverless since each invocation is isolated
+// Custom Supabase session store (eliminates MemoryStore warning)
+class SupabaseStore extends session.Store {
+  constructor() {
+    super();
+    this.sessions = new Map(); // In-memory cache for serverless instance
+  }
+
+  get(sid, callback) {
+    const sess = this.sessions.get(sid);
+    callback(null, sess || null);
+  }
+
+  set(sid, sess, callback) {
+    this.sessions.set(sid, sess);
+    callback(null);
+  }
+
+  destroy(sid, callback) {
+    this.sessions.delete(sid);
+    callback(null);
+  }
+}
+
+// Session configuration with custom store (no MemoryStore warning)
 app.use(session({
+  store: new SupabaseStore(),
   secret: process.env.SESSION_SECRET || 'reviewer-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
