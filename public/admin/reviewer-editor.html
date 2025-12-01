@@ -121,7 +121,7 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
-            <button class="btn btn-pink me-2" onclick="saveReviewer()">
+            <button class="btn btn-pink me-2 text-light" onclick="saveReviewer()">
               <i class="bi bi-save"></i> Save Reviewer
             </button>
           </li>
@@ -184,7 +184,7 @@
                 <button class="btn btn-sm btn-outline-pink" onclick="showImportModal()">
                   <i class="bi bi-upload"></i> Import
                 </button>
-                <button class="btn btn-pink btn-sm" onclick="showAddQuestionModal()">
+                <button class="btn btn-pink btn-sm text-light" onclick="showAddQuestionModal()">
                   <i class="bi bi-plus-circle"></i> Add Question
                 </button>
               </div>
@@ -201,7 +201,7 @@
       <!-- Save Button (Bottom) -->
       <div class="row mb-4">
         <div class="col-12 text-center">
-          <button class="btn btn-pink btn-lg px-5" onclick="saveReviewer()">
+          <button class="btn btn-pink btn-lg px-5 text-light" onclick="saveReviewer()">
             <i class="bi bi-save"></i> Save Reviewer
           </button>
         </div>
@@ -214,7 +214,7 @@
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="questionModalTitle">Add Question</h5>
+          <h5 class="modal-title " id="questionModalTitle">Add Question</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
 
@@ -351,7 +351,7 @@
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Preview Reviewer</h5>
+          <h5 class="modal-title">Preview</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -359,7 +359,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-pink" data-bs-dismiss="modal">Close</button>
-          <button type="button" class="btn btn-pink" onclick="downloadPreviewPdf()">Download as PDF</button>
+          <button type="button" class="btn btn-pink text-light" onclick="downloadPreviewPdf()">Download as PDF</button>
         </div>
       </div>
     </div>

@@ -267,7 +267,7 @@ function goBack() {
   if (subjectId) {
     window.location.href = `/admin/subject-reviewers.html?id=${subjectId}`;
   } else {
-    window.location.href = '/admin/dashboard.html';
+    window.location.href = '/admin/subject-reviewers.html';
   }
 }
 

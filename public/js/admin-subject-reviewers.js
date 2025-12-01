@@ -82,7 +82,7 @@ async function loadReviewers() {
     tbody.innerHTML = reviewers.map((reviewer, index) => `
       <tr>
         <td>
-          <div class="badge badge-pink">${index + 1}</div>
+          <div class="badge badge-pink text-light">${index + 1}</div>
         </td>
         <td><strong>${escapeHtml(reviewer.title)}</strong></td>
         <td>${new Date(reviewer.created_at).toLocaleDateString()}</td>
