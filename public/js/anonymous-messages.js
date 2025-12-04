@@ -63,6 +63,24 @@ let messageCheckInterval = null;
 let deviceId = null;
 let violationCount = 0;
 let isBanned = false;
+let presenceChannel = null;
+let presenceUpdateInterval = null;
+let sessionId = null;
+
+// Generate unique session ID (persists across pages)
+function generateSessionId() {
+  if (!sessionId) {
+    // Try to get existing session ID from localStorage
+    sessionId = localStorage.getItem('userSessionId');
+    
+    if (!sessionId) {
+      // Create new session ID only if none exists
+      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('userSessionId', sessionId);
+    }
+  }
+  return sessionId;
+}
 
 // Generate device fingerprint (non-bypassable identifier)
 function generateDeviceId() {
@@ -276,6 +294,12 @@ async function initFloatingMessages() {
   // Load messages and start polling
   loadMessages();
   startMessagePolling();
+  
+  // Start presence tracking globally (on all pages)
+  startPresenceTracking();
+  
+  // Start presence tracking globally (on all pages)
+  startPresenceTracking();
 
   // Generate username on first load
   getAnonymousUsername();
@@ -297,13 +321,21 @@ function createMessageModal() {
       <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
           <div class="modal-header border-0 pb-2">
-            <div>
-              <h5 class="modal-title mb-1">
-                <i class="bi bi-chat-dots-fill text-pink"></i> Community
-              </h5>
-              <small class="text-muted d-block">
-                <i class="bi bi-incognito"></i> Posting as <strong class="text-pink" id="currentUsername"></strong>
-              </small>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h5 class="modal-title mb-1">
+                    <i class="bi bi-chat-dots-fill text-pink"></i> Community
+                  </h5>
+                  <small class="text-muted d-block">
+                    <i class="bi bi-incognito"></i> Posting as <strong class="text-pink" id="currentUsername"></strong>
+                  </small>
+                </div>
+                <div class="online-users-indicator">
+                  <i class="bi bi-circle-fill text-success online-pulse"></i>
+                  <span id="onlineUsersCount" class="fw-bold">0</span> online
+                </div>
+              </div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
@@ -390,6 +422,9 @@ async function toggleMessageModal() {
   
   loadMessages();
   resetMessageBadge();
+  
+  // Update online count immediately when modal opens
+  updateOnlineUsersCount();
   
   // Disable input if banned
   if (isBanned) {
@@ -652,6 +687,88 @@ function stopMessagePolling() {
     messageCheckInterval = null;
   }
 }
+
+// Track user presence
+async function trackPresence() {
+  try {
+    const sid = generateSessionId();
+    const { error } = await supabase
+      .from('user_presence')
+      .upsert({
+        session_id: sid,
+        last_seen: new Date().toISOString()
+      }, {
+        onConflict: 'session_id'
+      });
+    
+    if (error) throw error;
+  } catch (error) {
+    // Silent error handling
+  }
+}
+
+// Get online users count
+async function updateOnlineUsersCount() {
+  try {
+    // Consider users online if they were active in the last 60 seconds
+    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    
+    const { count, error } = await supabase
+      .from('user_presence')
+      .select('*', { count: 'exact', head: true })
+      .gte('last_seen', oneMinuteAgo);
+    
+    if (error) throw error;
+    
+    const countEl = document.getElementById('onlineUsersCount');
+    if (countEl) {
+      countEl.textContent = count || 0;
+    }
+  } catch (error) {
+    // Silent error handling
+  }
+}
+
+// Start presence tracking
+function startPresenceTracking() {
+  // Track presence immediately
+  trackPresence();
+  updateOnlineUsersCount();
+  
+  // Update presence every 5 seconds
+  if (presenceUpdateInterval) {
+    clearInterval(presenceUpdateInterval);
+  }
+  presenceUpdateInterval = setInterval(() => {
+    trackPresence();
+    updateOnlineUsersCount();
+  }, 5000);
+}
+
+// Stop presence tracking
+function stopPresenceTracking() {
+  if (presenceUpdateInterval) {
+    clearInterval(presenceUpdateInterval);
+    presenceUpdateInterval = null;
+  }
+}
+
+// Cleanup presence on page unload
+window.addEventListener('beforeunload', async () => {
+  if (sessionId) {
+    try {
+      await supabase
+        .from('user_presence')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      // Remove session from localStorage
+      localStorage.removeItem('userSessionId');
+    } catch (error) {
+      // Silent error handling
+    }
+  }
+});
 
 // Initialize on page load
 if (document.readyState === 'loading') {

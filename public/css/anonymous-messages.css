@@ -263,3 +263,40 @@
 .message-badge {
   animation: badgePulse 2s infinite;
 }
+
+/* Online Users Indicator */
+.online-users-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0f9ff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #333;
+  border: 1px solid #d1e7ff;
+  white-space: nowrap;
+}
+
+.online-users-indicator i {
+  font-size: 10px;
+  animation: onlinePulse 2s infinite;
+}
+
+@keyframes onlinePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.online-pulse {
+  filter: drop-shadow(0 0 3px rgba(40, 167, 69, 0.6));
+}
+
+#onlineUsersCount {
+  color: #28a745;
+  font-size: 14px;
+}
