@@ -70,24 +70,37 @@ async function getActiveDevices() {
     const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
     const myDeviceId = generateDeviceId();
     
-    console.log('Getting active devices, excluding:', myDeviceId.substring(0, 10) + '...');
+    console.log('My device ID:', myDeviceId.substring(0, 15) + '...', 'Time cutoff:', fifteenSecondsAgo);
     
+    // First get all recent presence records for debugging
+    const { data: allData, error: allError } = await supabase
+      .from('user_presence')
+      .select('device_id, username, device_name, last_seen')
+      .gte('last_seen', fifteenSecondsAgo)
+      .order('last_seen', { ascending: false });
+    
+    if (allError) throw allError;
+    
+    console.log('All online devices:', allData?.length || 0, allData?.map(d => ({
+      id: d.device_id.substring(0, 15) + '...',
+      username: d.username,
+      device: d.device_name,
+      lastSeen: new Date(d.last_seen).toLocaleTimeString()
+    })));
+    
+    // Now filter out current device
     const { data, error } = await supabase
       .from('user_presence')
       .select('*')
       .gte('last_seen', fifteenSecondsAgo)
-      .neq('device_id', myDeviceId) // Exclude current device
+      .neq('device_id', myDeviceId)
       .order('last_seen', { ascending: false })
       .limit(50);
     
     if (error) throw error;
     
     activeDevices = data || [];
-    console.log('Found active devices:', activeDevices.length, activeDevices.map(d => ({
-      username: d.username,
-      device: d.device_name,
-      id: d.device_id.substring(0, 10) + '...'
-    })));
+    console.log('Active devices (excluding me):', activeDevices.length);
     
     return activeDevices;
   } catch (error) {
@@ -320,12 +333,10 @@ async function loadConversation(deviceId) {
       
       return `
         <div class="message-${isFromMe ? 'from-me' : 'from-them'}">
-          <div>
-            <div class="message-content-dm">
-              ${sanitizedMessage}
-            </div>
-            <small class="message-time-dm">${timeAgo}</small>
+          <div class="message-content-dm">
+            ${sanitizedMessage}
           </div>
+          <small class="message-time-dm">${timeAgo}</small>
         </div>
       `;
     }).join('');
@@ -498,6 +509,8 @@ function subscribeToDirectMessages(targetDeviceId) {
   
   const myDeviceId = generateDeviceId();
   
+  console.log('Subscribing to direct messages with:', targetDeviceId.substring(0, 10) + '...');
+  
   // Subscribe to new messages in this conversation
   directMessageChannel = supabase
     .channel(`dm:${myDeviceId}:${targetDeviceId}`)
@@ -507,16 +520,44 @@ function subscribeToDirectMessages(targetDeviceId) {
       table: 'direct_messages',
       filter: `to_device_id=eq.${myDeviceId}`
     }, (payload) => {
+      console.log('New direct message received:', payload);
       // Only update if message is from current conversation partner
       if (payload.new.from_device_id === targetDeviceId) {
         loadConversation(targetDeviceId);
         markMessagesAsRead(targetDeviceId);
       } else {
+        // Show notification for messages from other devices
+        if (typeof showMessageNotification === 'function' && payload.new) {
+          // Get sender info from active devices
+          const sender = activeDevices.find(d => d.device_id === payload.new.from_device_id);
+          showMessageNotification({
+            type: 'direct',
+            username: sender?.username || 'Anonymous',
+            message: payload.new.message || '',
+            deviceName: sender?.device_name || 'Unknown Device',
+            timestamp: payload.new.created_at || new Date().toISOString(),
+            deviceId: payload.new.from_device_id
+          });
+        }
         // Update unread count for other conversations
         updateUnreadCounts();
       }
     })
-    .subscribe();
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'direct_messages',
+      filter: `from_device_id=eq.${myDeviceId}`
+    }, (payload) => {
+      console.log('My message confirmed:', payload);
+      // Refresh conversation to show sent message immediately
+      if (payload.new.to_device_id === targetDeviceId) {
+        loadConversation(targetDeviceId);
+      }
+    })
+    .subscribe((status) => {
+      console.log('Direct message subscription status:', status);
+    });
 }
 
 // Refresh device list manually
@@ -569,6 +610,42 @@ async function initDeviceMessaging() {
       // Refresh active devices when presence changes
       await getActiveDevices();
       renderActiveDevicesList();
+    })
+    .subscribe();
+  
+  // Subscribe to all incoming direct messages for notifications
+  const myDeviceId = generateDeviceId();
+  const globalDmChannel = supabase
+    .channel('global-direct-messages')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'direct_messages',
+      filter: `to_device_id=eq.${myDeviceId}`
+    }, (payload) => {
+      console.log('New direct message notification:', payload);
+      
+      // Show notification if not in current conversation
+      if (typeof showMessageNotification === 'function' && payload.new) {
+        const fromDeviceId = payload.new.from_device_id;
+        
+        // Don't show if currently viewing this conversation
+        if (!currentConversation || currentConversation.deviceId !== fromDeviceId) {
+          // Get sender info from active devices
+          const sender = activeDevices.find(d => d.device_id === fromDeviceId);
+          showMessageNotification({
+            type: 'direct',
+            username: sender?.username || 'Anonymous',
+            message: payload.new.message || '',
+            deviceName: sender?.device_name || 'Unknown Device',
+            timestamp: payload.new.created_at || new Date().toISOString(),
+            deviceId: fromDeviceId
+          });
+        }
+      }
+      
+      // Update unread counts
+      updateUnreadCounts();
     })
     .subscribe();
   

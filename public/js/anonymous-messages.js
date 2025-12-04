@@ -65,6 +65,7 @@ let violationCount = 0;
 let isBanned = false;
 let presenceChannel = null;
 let presenceUpdateInterval = null;
+let communityMessagesChannel = null;
 
 // Generate device fingerprint (non-bypassable identifier)
 function generateDeviceId() {
@@ -81,16 +82,27 @@ function generateDeviceId() {
       ctx.fillText('fingerprint', 2, 2);
       const canvasData = canvas.toDataURL();
       
+      // Add random component for uniqueness per browser instance
+      const randomSeed = Math.random().toString(36).substring(2, 15) + 
+                         Math.random().toString(36).substring(2, 15);
+      
       const fingerprint = [
         navigator.userAgent,
         navigator.language,
+        navigator.languages ? navigator.languages.join(',') : '',
         screen.colorDepth,
         screen.width + 'x' + screen.height,
+        screen.availWidth + 'x' + screen.availHeight,
         new Date().getTimezoneOffset(),
         !!window.sessionStorage,
         !!window.localStorage,
         navigator.hardwareConcurrency || 'unknown',
-        canvasData.substring(0, 100)
+        navigator.deviceMemory || 'unknown',
+        navigator.platform,
+        navigator.vendor,
+        canvasData.substring(0, 100),
+        randomSeed, // Unique per session/device
+        Date.now() // Timestamp to ensure uniqueness
       ].join('|');
       
       // Create hash of fingerprint
@@ -99,6 +111,8 @@ function generateDeviceId() {
       // Store in multiple places to prevent easy bypass
       localStorage.setItem('deviceId', deviceId);
       sessionStorage.setItem('deviceId', deviceId);
+      
+      console.log('Generated new device ID:', deviceId.substring(0, 10) + '...');
       
       // Also create a backup in IndexedDB
       try {
@@ -118,6 +132,8 @@ function generateDeviceId() {
       } catch (e) {
         console.error('IndexedDB not available');
       }
+    } else {
+      console.log('Using existing device ID:', deviceId.substring(0, 10) + '...');
     }
   }
   return deviceId;
@@ -428,6 +444,9 @@ async function toggleMessageModal() {
   
   loadMessages();
   resetMessageBadge();
+  
+  // Subscribe to real-time community messages
+  subscribeToCommunityMessages();
   
   // Update online count immediately when modal opens
   updateOnlineUsersCount();
@@ -768,6 +787,49 @@ function stopPresenceTracking() {
   }
 }
 
+// Subscribe to real-time community messages
+function subscribeToCommunityMessages() {
+  // Unsubscribe from previous channel if exists
+  if (communityMessagesChannel) {
+    communityMessagesChannel.unsubscribe();
+  }
+  
+  communityMessagesChannel = supabase
+    .channel('community-messages')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'anonymous_messages'
+    }, (payload) => {
+      console.log('New community message received:', payload);
+      
+      // Show notification preview if showMessageNotification is available
+      if (typeof showMessageNotification === 'function' && payload.new) {
+        showMessageNotification({
+          type: 'community',
+          username: payload.new.username || 'Anonymous',
+          message: payload.new.message || '',
+          timestamp: payload.new.created_at || new Date().toISOString()
+        });
+      }
+      
+      // Reload messages when new message is inserted
+      loadMessages();
+    })
+    .subscribe();
+  
+  console.log('Subscribed to community messages');
+}
+
+// Unsubscribe from community messages
+function unsubscribeFromCommunityMessages() {
+  if (communityMessagesChannel) {
+    communityMessagesChannel.unsubscribe();
+    communityMessagesChannel = null;
+    console.log('Unsubscribed from community messages');
+  }
+}
+
 // Do NOT remove the persisted device on page unload.
 // The device_id persists across sessions and page navigations.
 // Rely on server-side cleanup of stale `last_seen` timestamps instead.
@@ -815,9 +877,13 @@ window.switchMessageTab = function(tabName) {
     communityTab.classList.add('active');
     directTab.classList.remove('active');
     loadMessages();
+    // Subscribe to community messages
+    subscribeToCommunityMessages();
   } else if (tabName === 'direct') {
     communityTab.classList.remove('active');
     directTab.classList.add('active');
+    // Unsubscribe from community messages when switching away
+    unsubscribeFromCommunityMessages();
     // Refresh device list when switching to direct messages tab
     if (typeof window.refreshDeviceList === 'function') {
       window.refreshDeviceList();

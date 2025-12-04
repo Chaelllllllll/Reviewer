@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/css/anonymous-messages.css">
   <link rel="stylesheet" href="/css/device-messaging.css">
   <link rel="stylesheet" href="/css/notifications.css">
+  <link rel="stylesheet" href="/css/message-notifications.css">
   <style>
     .quiz-card { border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.06); }
     .quiz-header { background: linear-gradient(90deg, rgba(255,212,229,0.08), rgba(255,232,240,0.04)); border-bottom: 1px solid rgba(0,0,0,0.03); }
@@ -63,11 +64,15 @@
     </div>
   </footer>
 
+  <!-- Message Notification Container -->
+  <div class="message-notification-container" id="messageNotificationContainer"></div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/js/supabase-config.js"></script>
   <script src="/js/quiz.js"></script>
   <script src="/js/anonymous-messages.js"></script>
   <script src="/js/device-messaging.js"></script>
+  <script src="/js/message-notifications.js"></script>
   <script src="/js/notifications.js"></script>
 </body>
 </html>

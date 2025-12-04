@@ -21,7 +21,7 @@
   position: relative;
   width: 45px;
   height: 45px;
-  background: linear-gradient(135deg, var(--pink), #ff69b4);
+  background: linear-gradient(135deg, #E91E63, #F06292);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -111,15 +111,19 @@
 
 .message-from-me {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 4px;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-bottom: 6px;
+  padding: 0 10px;
   animation: messageSlideInRight 0.3s ease-out;
 }
 
 .message-from-them {
   display: flex;
-  justify-content: flex-start;
-  margin-bottom: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 6px;
+  padding: 0 10px;
   animation: messageSlideInLeft 0.3s ease-out;
 }
 
@@ -203,24 +207,15 @@
 .message-time-dm {
   color: #999;
   font-size: 0.7rem;
-  padding: 0 8px;
-  margin-top: 4px;
+  padding: 2px 8px 0 8px;
+  margin-top: 2px;
   display: block;
   font-weight: 500;
   opacity: 0;
   transition: opacity 0.2s ease;
-  text-align: right;
 }
 
-.message-from-me:hover .message-time-dm {
-  opacity: 1;
-}
-
-.message-from-them .message-time-dm {
-  color: #999;
-  text-align: left;
-}
-
+.message-from-me:hover .message-time-dm,
 .message-from-them:hover .message-time-dm {
   opacity: 1;
 }
