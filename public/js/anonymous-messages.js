@@ -65,22 +65,6 @@ let violationCount = 0;
 let isBanned = false;
 let presenceChannel = null;
 let presenceUpdateInterval = null;
-let sessionId = null;
-
-// Generate unique session ID (persists across pages)
-function generateSessionId() {
-  if (!sessionId) {
-    // Try to get existing session ID from localStorage
-    sessionId = localStorage.getItem('userSessionId');
-    
-    if (!sessionId) {
-      // Create new session ID only if none exists
-      sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('userSessionId', sessionId);
-    }
-  }
-  return sessionId;
-}
 
 // Generate device fingerprint (non-bypassable identifier)
 function generateDeviceId() {
@@ -314,52 +298,74 @@ async function initFloatingMessages() {
   }
 }
 
-// Create message modal
+// Create message modal with tabs for community and direct messages
 function createMessageModal() {
   const modalHTML = `
     <div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg">
         <div class="modal-content shadow-lg border-0">
           <div class="modal-header border-0 pb-2">
             <div class="flex-grow-1">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <h5 class="modal-title mb-1">
-                    <i class="bi bi-chat-dots-fill text-pink"></i> Community
-                  </h5>
-                  <small class="text-muted d-block">
-                    <i class="bi bi-incognito"></i> Posting as <strong class="text-pink" id="currentUsername"></strong>
-                  </small>
-                </div>
-                <div class="online-users-indicator">
-                  <i class="bi bi-circle-fill text-success online-pulse"></i>
-                  <span id="onlineUsersCount" class="fw-bold">0</span> online
-                </div>
-              </div>
+              <h5 class="modal-title mb-1">
+                <i class="bi bi-chat-dots-fill text-pink"></i> Messages
+              </h5>
+              <small class="text-muted d-block">
+                <i class="bi bi-incognito"></i> Posting as <strong class="text-pink" id="currentUsername"></strong>
+              </small>
             </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="online-users-indicator">
+              <i class="bi bi-circle-fill text-success online-pulse"></i>
+              <span id="onlineUsersCount" class="fw-bold">0</span> online
+            </div>
+            <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
+          
+          <!-- Tab Navigation -->
+          <div class="message-tabs px-3">
+            <button class="message-tab active" onclick="switchMessageTab('community')">
+              <i class="bi bi-people-fill"></i> Community
+            </button>
+            <button class="message-tab" onclick="switchMessageTab('direct')">
+              <i class="bi bi-person-fill"></i> Direct Messages
+              <span id="dmTabBadge" class="message-tab-badge" style="display:none;">0</span>
+            </button>
+          </div>
+          
           <div class="modal-body px-0 py-0">
-            <div id="messagesContainer" class="messages-container">
-              <div class="text-center text-muted py-5">
-                <div class="spinner-border spinner-pink" role="status">
-                  <span class="visually-hidden">Loading...</span>
+            <!-- Community Messages Tab -->
+            <div id="communityTab" class="tab-content active">
+              <div id="messagesContainer" class="messages-container">
+                <div class="text-center text-muted py-5">
+                  <div class="spinner-border spinner-pink" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <p class="small mt-3 mb-0">Loading messages...</p>
                 </div>
-                <p class="small mt-3 mb-0">Loading messages...</p>
+              </div>
+              <div class="px-3 pt-2 pb-3 border-top">
+                <div id="messageError" class="alert alert-danger alert-sm mb-2" style="display:none;"></div>
+                <div class="input-group">
+                  <input type="text" class="form-control border-2" id="messageInput" placeholder="Share your thoughts..." maxlength="500">
+                  <button class="btn btn-pink text-light px-4" type="button" onclick="sendMessage()">
+                    <i class="bi bi-send-fill"></i>
+                  </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  <small class="text-muted" id="charCount">0/500</small>
+                  <small class="text-muted"><i class="bi bi-shield-check"></i> Secured</small>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="modal-footer border-0 pt-2">
-            <div class="w-100">
-              <div id="messageError" class="alert alert-danger alert-sm mb-2" style="display:none;"></div>
-              <div class="input-group">
-                <input type="text" class="form-control border-2" id="messageInput" placeholder="Share your thoughts..." maxlength="500">
-                <button class="btn btn-pink text-light px-4" type="button" onclick="sendMessage()">
-                  <i class="bi bi-send-fill"></i>
-                </button>
-              </div>
-              <div class="d-flex justify-content-between align-items-center mt-2">
-                <small class="text-muted" id="charCount">0/500</small>
+            
+            <!-- Direct Messages Tab -->
+            <div id="directTab" class="tab-content">
+              <div id="activeDevicesList" class="devices-container">
+                <div class="text-center text-muted py-5">
+                  <div class="spinner-border spinner-pink" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <p class="small mt-3 mb-0">Loading devices...</p>
+                </div>
               </div>
             </div>
           </div>
@@ -691,14 +697,14 @@ function stopMessagePolling() {
 // Track user presence
 async function trackPresence() {
   try {
-    const sid = generateSessionId();
+    const devId = generateDeviceId();
     const { error } = await supabase
       .from('user_presence')
       .upsert({
-        session_id: sid,
+        device_id: devId,
         last_seen: new Date().toISOString()
       }, {
-        onConflict: 'session_id'
+        onConflict: 'device_id'
       });
     
     if (error) throw error;
@@ -710,13 +716,21 @@ async function trackPresence() {
 // Get online users count
 async function updateOnlineUsersCount() {
   try {
-    // Consider users online if they were active in the last 60 seconds
-    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    // Clean up stale records (older than 2 minutes)
+    const twoMinutesAgo = new Date(Date.now() - 120000).toISOString();
+    await supabase
+      .from('user_presence')
+      .delete()
+      .lt('last_seen', twoMinutesAgo);
+    
+    // Consider users online if they were active in the last 15 seconds
+    // (We update every 5 seconds, so 15 seconds gives 3x buffer)
+    const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
     
     const { count, error } = await supabase
       .from('user_presence')
       .select('*', { count: 'exact', head: true })
-      .gte('last_seen', oneMinuteAgo);
+      .gte('last_seen', fifteenSecondsAgo);
     
     if (error) throw error;
     
@@ -753,20 +767,19 @@ function stopPresenceTracking() {
   }
 }
 
-// Cleanup presence on page unload
-window.addEventListener('beforeunload', async () => {
-  if (sessionId) {
-    try {
-      await supabase
-        .from('user_presence')
-        .delete()
-        .eq('session_id', sessionId);
-      
-      // Remove session from localStorage
-      localStorage.removeItem('userSessionId');
-    } catch (error) {
-      // Silent error handling
+// Do NOT remove the persisted device on page unload.
+// The device_id persists across sessions and page navigations.
+// Rely on server-side cleanup of stale `last_seen` timestamps instead.
+window.addEventListener('beforeunload', () => {
+  // Best-effort: try to update last_seen once more (non-blocking)
+  try {
+    const devId = deviceId || generateDeviceId();
+    if (devId && typeof supabase !== 'undefined') {
+      // Fire-and-forget, do not await — network may be blocked on unload
+      supabase.from('user_presence').upsert({ device_id: devId, last_seen: new Date().toISOString() }, { onConflict: 'device_id' });
     }
+  } catch (e) {
+    // silent
   }
 });
 
@@ -780,3 +793,33 @@ if (document.readyState === 'loading') {
 // Expose functions globally
 window.sendMessage = sendMessage;
 window.toggleMessageModal = toggleMessageModal;
+
+// Switch between message tabs
+window.switchMessageTab = function(tabName) {
+  const communityTab = document.getElementById('communityTab');
+  const directTab = document.getElementById('directTab');
+  const tabs = document.querySelectorAll('.message-tab');
+  
+  // Update tab buttons
+  tabs.forEach(tab => {
+    if (tab.textContent.toLowerCase().includes(tabName)) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+  
+  // Update tab content
+  if (tabName === 'community') {
+    communityTab.classList.add('active');
+    directTab.classList.remove('active');
+    loadMessages();
+  } else if (tabName === 'direct') {
+    communityTab.classList.remove('active');
+    directTab.classList.add('active');
+    // Trigger device messaging update
+    if (typeof window.initDeviceMessaging === 'function') {
+      window.initDeviceMessaging();
+    }
+  }
+};
