@@ -469,20 +469,21 @@ async function loadMessages() {
       const date = new Date(msg.created_at);
       const timeAgo = getTimeAgo(date);
       const sanitizedMessage = escapeHtml(msg.message);
+      const sanitizedUsername = escapeHtml(msg.username);
       
       return `
         <div class="message-item">
-          <div class="d-flex align-items-start gap-2">
-            <div class="message-avatar">
-              <i class="bi bi-person-circle"></i>
+          <div class="message-avatar">
+            <i class="bi bi-person-fill"></i>
+          </div>
+          <div class="message-bubble">
+            <div class="message-header">
+              <strong class="message-username">${sanitizedUsername}</strong>
             </div>
-            <div class="flex-grow-1">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <strong class="message-username">${escapeHtml(msg.username)}</strong>
-                <small class="message-time">${timeAgo}</small>
-              </div>
+            <div class="message-content-wrapper">
               <div class="message-content">${sanitizedMessage}</div>
             </div>
+            <small class="message-time">${timeAgo}</small>
           </div>
         </div>
       `;
@@ -817,9 +818,9 @@ window.switchMessageTab = function(tabName) {
   } else if (tabName === 'direct') {
     communityTab.classList.remove('active');
     directTab.classList.add('active');
-    // Trigger device messaging update
-    if (typeof window.initDeviceMessaging === 'function') {
-      window.initDeviceMessaging();
+    // Refresh device list when switching to direct messages tab
+    if (typeof window.refreshDeviceList === 'function') {
+      window.refreshDeviceList();
     }
   }
 };

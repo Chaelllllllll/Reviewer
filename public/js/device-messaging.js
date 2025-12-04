@@ -41,6 +41,9 @@ async function trackDevicePresence() {
     const devId = generateDeviceId();
     const { browser, os } = getBrowserInfo();
     const deviceName = getDeviceName();
+    const username = getAnonymousUsername();
+    
+    console.log('Tracking presence:', { devId: devId.substring(0, 10) + '...', deviceName, username });
     
     const { error } = await supabase
       .from('user_presence')
@@ -49,7 +52,7 @@ async function trackDevicePresence() {
         device_name: deviceName,
         browser: browser,
         os: os,
-        username: getAnonymousUsername(),
+        username: username,
         last_seen: new Date().toISOString()
       }, {
         onConflict: 'device_id'
@@ -67,6 +70,8 @@ async function getActiveDevices() {
     const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
     const myDeviceId = generateDeviceId();
     
+    console.log('Getting active devices, excluding:', myDeviceId.substring(0, 10) + '...');
+    
     const { data, error } = await supabase
       .from('user_presence')
       .select('*')
@@ -78,6 +83,12 @@ async function getActiveDevices() {
     if (error) throw error;
     
     activeDevices = data || [];
+    console.log('Found active devices:', activeDevices.length, activeDevices.map(d => ({
+      username: d.username,
+      device: d.device_name,
+      id: d.device_id.substring(0, 10) + '...'
+    })));
+    
     return activeDevices;
   } catch (error) {
     console.error('Error getting active devices:', error);
@@ -308,11 +319,13 @@ async function loadConversation(deviceId) {
       const sanitizedMessage = escapeHtml(msg.message);
       
       return `
-        <div class="message-item ${isFromMe ? 'message-from-me' : 'message-from-them'}">
-          <div class="message-content-dm">
-            ${sanitizedMessage}
+        <div class="message-${isFromMe ? 'from-me' : 'from-them'}">
+          <div>
+            <div class="message-content-dm">
+              ${sanitizedMessage}
+            </div>
+            <small class="message-time-dm">${timeAgo}</small>
           </div>
-          <small class="message-time-dm">${timeAgo}</small>
         </div>
       `;
     }).join('');
@@ -506,8 +519,24 @@ function subscribeToDirectMessages(targetDeviceId) {
     .subscribe();
 }
 
+// Refresh device list manually
+async function refreshDeviceList() {
+  console.log('Refreshing device list...');
+  await trackDevicePresence();
+  await getActiveDevices();
+  await updateUnreadCounts();
+  renderActiveDevicesList();
+}
+
 // Initialize device messaging system
 async function initDeviceMessaging() {
+  // Ensure dependencies are loaded
+  if (typeof generateDeviceId !== 'function' || typeof supabase === 'undefined') {
+    console.log('Waiting for dependencies...');
+    setTimeout(initDeviceMessaging, 500);
+    return;
+  }
+  
   // Track presence with device info
   await trackDevicePresence();
   
@@ -526,27 +555,37 @@ async function initDeviceMessaging() {
     renderActiveDevicesList();
   }, 5000);
   
-  // Subscribe to presence changes
-  const presenceChannel = supabase.channel('online-devices')
+  // Subscribe to presence changes with realtime
+  const presenceChannel = supabase.channel('online-devices', {
+    config: {
+      broadcast: { self: false }
+    }
+  })
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'user_presence'
-    }, () => {
+    }, async () => {
       // Refresh active devices when presence changes
-      getActiveDevices().then(renderActiveDevicesList);
+      await getActiveDevices();
+      renderActiveDevicesList();
     })
     .subscribe();
+  
+  console.log('Device messaging initialized');
 }
 
 // Expose functions globally
 window.openDirectMessage = openDirectMessage;
 window.sendDirectMessage = sendDirectMessage;
 window.initDeviceMessaging = initDeviceMessaging;
+window.refreshDeviceList = refreshDeviceList;
 
 // Auto-initialize on page load (after other scripts)
-setTimeout(() => {
-  if (typeof supabase !== 'undefined' && typeof generateDeviceId === 'function') {
-    initDeviceMessaging();
-  }
-}, 1000);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(initDeviceMessaging, 1000);
+  });
+} else {
+  setTimeout(initDeviceMessaging, 1000);
+}
