@@ -352,8 +352,8 @@ function startNotificationChecks() {
   // Check immediately
   checkAllUpdates();
   
-  // Then check every 2 minutes
-  setInterval(checkAllUpdates, 2 * 60 * 1000);
+  // Then check every 1 second
+  setInterval(checkAllUpdates, 1000);
 }
 
 // Initialize notifications
