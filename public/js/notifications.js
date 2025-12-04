@@ -106,7 +106,6 @@ function showNotification(title, options = {}) {
 // Check for new messages
 async function checkNewMessages() {
   if (typeof supabase === 'undefined') {
-    console.warn('Supabase not available for checkNewMessages');
     return;
   }
   
@@ -142,7 +141,6 @@ async function checkNewMessages() {
 // Check for new subjects
 async function checkNewSubjects() {
   if (typeof supabase === 'undefined') {
-    console.warn('Supabase not available for checkNewSubjects');
     return;
   }
   
@@ -181,7 +179,6 @@ async function checkNewSubjects() {
 // Check for new courses
 async function checkNewCourses() {
   if (typeof supabase === 'undefined') {
-    console.warn('Supabase not available for checkNewCourses');
     return;
   }
   
@@ -220,7 +217,6 @@ async function checkNewCourses() {
 // Check for new reviewers
 async function checkNewReviewers() {
   if (typeof supabase === 'undefined') {
-    console.warn('Supabase not available for checkNewReviewers');
     return;
   }
   
@@ -261,7 +257,6 @@ async function checkNewReviewers() {
 // Load initial counts without showing notifications
 async function loadInitialCounts() {
   if (typeof supabase === 'undefined') {
-    console.warn('Supabase not available for loadInitialCounts');
     return;
   }
   
@@ -279,10 +274,8 @@ async function loadInitialCounts() {
     if (!subjects.error) lastCheckedCounts.subjects = subjects.count || 0;
     if (!courses.error) lastCheckedCounts.courses = courses.count || 0;
     if (!reviewers.error) lastCheckedCounts.reviewers = reviewers.count || 0;
-    
-    console.log('Initial notification counts loaded:', lastCheckedCounts);
   } catch (error) {
-    console.error('Error loading initial counts:', error);
+    // Silent error handling
   }
 }
 
@@ -422,29 +415,20 @@ window.requestNotificationPermission = requestNotificationPermission;
 window.showNotificationPrompt = showNotificationPrompt;
 window.showNotification = showNotification; // Expose for testing
 
-// Enhanced test notification function
+// Test notification function
 window.testNotification = function() {
-  console.log('=== Notification Test ===');
-  console.log('Browser supports notifications:', 'Notification' in window);
-  console.log('Permission status:', Notification.permission);
-  
   if (!('Notification' in window)) {
-    console.error('❌ This browser does not support notifications');
     alert('Your browser does not support notifications');
     return;
   }
   
   if (Notification.permission === 'denied') {
-    console.error('❌ Notification permission is DENIED');
     alert('Notifications are blocked. Please enable them in your browser settings.');
     return;
   }
   
   if (Notification.permission === 'default') {
-    console.warn('⚠️ Permission not yet requested');
-    console.log('Requesting permission...');
     Notification.requestPermission().then(permission => {
-      console.log('Permission result:', permission);
       if (permission === 'granted') {
         sendTestNotification();
       }
@@ -453,7 +437,6 @@ window.testNotification = function() {
   }
   
   if (Notification.permission === 'granted') {
-    console.log('✅ Permission granted, sending test notification...');
     sendTestNotification();
   }
 };
@@ -470,15 +453,10 @@ function sendTestNotification() {
     });
     
     notification.onclick = function() {
-      console.log('Notification clicked!');
       window.focus();
       this.close();
     };
-    
-    console.log('✅ Test notification created successfully!');
-    console.log('Notification object:', notification);
   } catch (error) {
-    console.error('❌ Error creating notification:', error);
     alert('Error creating notification: ' + error.message);
   }
 }
@@ -486,16 +464,4 @@ function sendTestNotification() {
 window.resetNotificationPrompt = function() {
   localStorage.removeItem('notificationPromptShown');
   showNotificationPrompt();
-  console.log('Notification prompt reset and shown');
-};
-
-// Debug function to check notification status
-window.checkNotificationStatus = function() {
-  console.log('=== Notification Status ===');
-  console.log('Supported:', 'Notification' in window);
-  console.log('Permission:', Notification.permission);
-  console.log('Prompt shown:', localStorage.getItem('notificationPromptShown'));
-  console.log('Enabled:', localStorage.getItem('notificationsEnabled'));
-  console.log('Last checked counts:', lastCheckedCounts);
-  console.log('Supabase loaded:', typeof supabase !== 'undefined');
 };
