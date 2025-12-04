@@ -141,6 +141,11 @@ async function checkNewMessages() {
 
 // Check for new subjects
 async function checkNewSubjects() {
+  if (typeof supabase === 'undefined') {
+    console.warn('Supabase not available for checkNewSubjects');
+    return;
+  }
+  
   try {
     const { count, error } = await supabase
       .from('subjects')
@@ -148,23 +153,17 @@ async function checkNewSubjects() {
 
     if (error) throw error;
 
-    if (lastCheckedCounts.subjects === 0) {
-      // First load, just store the count
-      lastCheckedCounts.subjects = count;
-      return;
-    }
-
     if (count > lastCheckedCounts.subjects) {
       const newCount = count - lastCheckedCounts.subjects;
       
-      // Fetch the new subjects to get names
+      // Fetch the new subjects to get titles
       const { data: newSubjects } = await supabase
         .from('subjects')
-        .select('name')
+        .select('title')
         .order('created_at', { ascending: false })
         .limit(newCount);
 
-      const subjectNames = newSubjects ? newSubjects.map(s => s.name).join(', ') : 'New subjects';
+      const subjectNames = newSubjects ? newSubjects.map(s => s.title).join(', ') : 'New subjects';
       
       showNotification('New Subjects Available', {
         body: `${newCount} new ${newCount === 1 ? 'subject' : 'subjects'} added: ${subjectNames}`,
@@ -181,6 +180,11 @@ async function checkNewSubjects() {
 
 // Check for new courses
 async function checkNewCourses() {
+  if (typeof supabase === 'undefined') {
+    console.warn('Supabase not available for checkNewCourses');
+    return;
+  }
+  
   try {
     const { count, error } = await supabase
       .from('courses')
@@ -188,22 +192,17 @@ async function checkNewCourses() {
 
     if (error) throw error;
 
-    if (lastCheckedCounts.courses === 0) {
-      lastCheckedCounts.courses = count;
-      return;
-    }
-
     if (count > lastCheckedCounts.courses) {
       const newCount = count - lastCheckedCounts.courses;
       
-      // Fetch the new courses to get names
+      // Fetch the new courses to get titles
       const { data: newCourses } = await supabase
         .from('courses')
-        .select('name')
+        .select('title')
         .order('created_at', { ascending: false })
         .limit(newCount);
 
-      const courseNames = newCourses ? newCourses.map(c => c.name).join(', ') : 'New courses';
+      const courseNames = newCourses ? newCourses.map(c => c.title).join(', ') : 'New courses';
       
       showNotification('New Courses Available', {
         body: `${newCount} new ${newCount === 1 ? 'course' : 'courses'} added: ${courseNames}`,
@@ -220,17 +219,17 @@ async function checkNewCourses() {
 
 // Check for new reviewers
 async function checkNewReviewers() {
+  if (typeof supabase === 'undefined') {
+    console.warn('Supabase not available for checkNewReviewers');
+    return;
+  }
+  
   try {
     const { count, error } = await supabase
       .from('reviewers')
       .select('*', { count: 'exact', head: true });
 
     if (error) throw error;
-
-    if (lastCheckedCounts.reviewers === 0) {
-      lastCheckedCounts.reviewers = count;
-      return;
-    }
 
     if (count > lastCheckedCounts.reviewers) {
       const newCount = count - lastCheckedCounts.reviewers;
@@ -256,6 +255,34 @@ async function checkNewReviewers() {
     lastCheckedCounts.reviewers = count;
   } catch (error) {
     console.error('Error checking new reviewers:', error);
+  }
+}
+
+// Load initial counts without showing notifications
+async function loadInitialCounts() {
+  if (typeof supabase === 'undefined') {
+    console.warn('Supabase not available for loadInitialCounts');
+    return;
+  }
+  
+  try {
+    // Load all counts in parallel
+    const [messages, subjects, courses, reviewers] = await Promise.all([
+      supabase.from('anonymous_messages').select('*', { count: 'exact', head: true }),
+      supabase.from('subjects').select('*', { count: 'exact', head: true }),
+      supabase.from('courses').select('*', { count: 'exact', head: true }),
+      supabase.from('reviewers').select('*', { count: 'exact', head: true })
+    ]);
+    
+    // Set initial counts
+    if (!messages.error) lastCheckedCounts.messages = messages.count || 0;
+    if (!subjects.error) lastCheckedCounts.subjects = subjects.count || 0;
+    if (!courses.error) lastCheckedCounts.courses = courses.count || 0;
+    if (!reviewers.error) lastCheckedCounts.reviewers = reviewers.count || 0;
+    
+    console.log('Initial notification counts loaded:', lastCheckedCounts);
+  } catch (error) {
+    console.error('Error loading initial counts:', error);
   }
 }
 
@@ -349,11 +376,11 @@ function dismissNotificationPrompt() {
 
 // Start periodic checks for updates
 function startNotificationChecks() {
-  // Check immediately
-  checkAllUpdates();
+  // Load initial counts first
+  loadInitialCounts();
   
-  // Then check every 1 second
-  setInterval(checkAllUpdates, 1000);
+  // Then check every 30 seconds
+  setInterval(checkAllUpdates, 5000);
 }
 
 // Initialize notifications
@@ -392,9 +419,83 @@ if (document.readyState === 'loading') {
 window.enableNotifications = enableNotifications;
 window.dismissNotificationPrompt = dismissNotificationPrompt;
 window.requestNotificationPermission = requestNotificationPermission;
-window.showNotificationPrompt = showNotificationPrompt; // For testing
+window.showNotificationPrompt = showNotificationPrompt;
+window.showNotification = showNotification; // Expose for testing
+
+// Enhanced test notification function
 window.testNotification = function() {
-  // Clear localStorage to test
+  console.log('=== Notification Test ===');
+  console.log('Browser supports notifications:', 'Notification' in window);
+  console.log('Permission status:', Notification.permission);
+  
+  if (!('Notification' in window)) {
+    console.error('❌ This browser does not support notifications');
+    alert('Your browser does not support notifications');
+    return;
+  }
+  
+  if (Notification.permission === 'denied') {
+    console.error('❌ Notification permission is DENIED');
+    alert('Notifications are blocked. Please enable them in your browser settings.');
+    return;
+  }
+  
+  if (Notification.permission === 'default') {
+    console.warn('⚠️ Permission not yet requested');
+    console.log('Requesting permission...');
+    Notification.requestPermission().then(permission => {
+      console.log('Permission result:', permission);
+      if (permission === 'granted') {
+        sendTestNotification();
+      }
+    });
+    return;
+  }
+  
+  if (Notification.permission === 'granted') {
+    console.log('✅ Permission granted, sending test notification...');
+    sendTestNotification();
+  }
+};
+
+function sendTestNotification() {
+  try {
+    const notification = new Notification('🎉 Test Notification', {
+      body: 'Success! Your notifications are working correctly.',
+      icon: '/images/logo.png',
+      badge: '/images/logo.png',
+      tag: 'test-notification',
+      requireInteraction: false,
+      vibrate: [200, 100, 200]
+    });
+    
+    notification.onclick = function() {
+      console.log('Notification clicked!');
+      window.focus();
+      this.close();
+    };
+    
+    console.log('✅ Test notification created successfully!');
+    console.log('Notification object:', notification);
+  } catch (error) {
+    console.error('❌ Error creating notification:', error);
+    alert('Error creating notification: ' + error.message);
+  }
+}
+
+window.resetNotificationPrompt = function() {
   localStorage.removeItem('notificationPromptShown');
   showNotificationPrompt();
+  console.log('Notification prompt reset and shown');
+};
+
+// Debug function to check notification status
+window.checkNotificationStatus = function() {
+  console.log('=== Notification Status ===');
+  console.log('Supported:', 'Notification' in window);
+  console.log('Permission:', Notification.permission);
+  console.log('Prompt shown:', localStorage.getItem('notificationPromptShown'));
+  console.log('Enabled:', localStorage.getItem('notificationsEnabled'));
+  console.log('Last checked counts:', lastCheckedCounts);
+  console.log('Supabase loaded:', typeof supabase !== 'undefined');
 };
