@@ -36,8 +36,8 @@ async function requestNotificationPermission() {
       // Show confirmation notification
       showNotification('Notifications Enabled', {
         body: 'You will now receive updates about new messages, subjects, courses, and reviewers!',
-        icon: '/images/icon.png',
-        badge: '/images/badge.png',
+        icon: '/images/logo.png',
+        badge: '/images/logo.png',
         tag: 'notification-enabled'
       });
       
@@ -59,8 +59,8 @@ function showNotification(title, options = {}) {
   if (Notification.permission !== 'granted') return;
 
   const defaultOptions = {
-    icon: '/images/icon.png',
-    badge: '/images/badge.png',
+    icon: '/images/logo.png',
+    badge: '/images/logo.png',
     vibrate: [200, 100, 200],
     requireInteraction: false,
     ...options
@@ -105,6 +105,11 @@ function showNotification(title, options = {}) {
 
 // Check for new messages
 async function checkNewMessages() {
+  if (typeof supabase === 'undefined') {
+    console.warn('Supabase not available for checkNewMessages');
+    return;
+  }
+  
   try {
     const { count, error } = await supabase
       .from('anonymous_messages')
@@ -273,7 +278,10 @@ function showNotificationPrompt() {
   if (hasResponded === 'true') return;
 
   // Check if already granted
-  if (Notification.permission === 'granted') return;
+  if (Notification.permission === 'granted') {
+    localStorage.setItem('notificationPromptShown', 'true');
+    return;
+  }
 
   // Create custom notification prompt
   const promptHTML = `
@@ -303,11 +311,15 @@ function showNotificationPrompt() {
 
   // Add to page after a delay
   setTimeout(() => {
+    if (!document.body) return;
     document.body.insertAdjacentHTML('beforeend', promptHTML);
+    
     // Show with animation
     setTimeout(() => {
       const prompt = document.getElementById('notificationPrompt');
-      if (prompt) prompt.classList.add('show');
+      if (prompt) {
+        prompt.classList.add('show');
+      }
     }, 100);
   }, 3000); // Show after 3 seconds
 }
@@ -348,13 +360,21 @@ function startNotificationChecks() {
 function initNotifications() {
   // Check if notifications are supported
   if (!('Notification' in window)) {
-    console.log('Notifications not supported');
     return;
   }
 
   // If already granted, start checks
   if (Notification.permission === 'granted') {
-    startNotificationChecks();
+    localStorage.setItem('notificationPromptShown', 'true');
+    if (typeof supabase !== 'undefined') {
+      startNotificationChecks();
+    } else {
+      setTimeout(() => {
+        if (typeof supabase !== 'undefined') {
+          startNotificationChecks();
+        }
+      }, 1000);
+    }
   } else if (Notification.permission === 'default') {
     // Show custom prompt
     showNotificationPrompt();
@@ -372,3 +392,9 @@ if (document.readyState === 'loading') {
 window.enableNotifications = enableNotifications;
 window.dismissNotificationPrompt = dismissNotificationPrompt;
 window.requestNotificationPermission = requestNotificationPermission;
+window.showNotificationPrompt = showNotificationPrompt; // For testing
+window.testNotification = function() {
+  // Clear localStorage to test
+  localStorage.removeItem('notificationPromptShown');
+  showNotificationPrompt();
+};
