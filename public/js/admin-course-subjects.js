@@ -4,6 +4,7 @@ const courseId = urlParams.get('id');
 let subjectModal;
 let deleteModal;
 let deleteSubjectId = null;
+let duplicateSubjectId = null;
 
 if (!courseId) {
   window.location.href = '/admin/dashboard.html';
@@ -90,6 +91,9 @@ async function loadSubjects() {
               </a>
               <button class="btn btn-outline-pink btn-sm" onclick="editSubject('${subject.id}')">
                 <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="showDuplicateModal('${subject.id}')" title="Duplicate subject to another course">
+                <i class="bi bi-files"></i>
               </button>
               <button class="btn btn-outline-danger btn-sm" onclick="deleteSubject('${subject.id}')">
                 <i class="bi bi-trash"></i>
@@ -202,6 +206,121 @@ async function confirmDelete() {
   } catch (error) {
     console.error('Error deleting subject:', error);
     alert('Failed to delete subject. Please try again.');
+  }
+}
+
+// Utility function
+// Duplicate subject modal handling
+async function showDuplicateModal(subjectId) {
+  duplicateSubjectId = subjectId;
+  // Populate courses dropdown
+  await loadAvailableCourses();
+  const dupModalEl = document.getElementById('duplicateModal');
+  const dupModal = new bootstrap.Modal(dupModalEl);
+  dupModal.show();
+}
+
+async function loadAvailableCourses() {
+  try {
+    const select = document.getElementById('targetCourseSelect');
+    if (!select) return;
+    select.innerHTML = '';
+
+    const { data: courses, error } = await supabase
+      .from('courses')
+      .select('*')
+      .order('title', { ascending: true });
+    if (error) throw error;
+
+    courses.forEach(c => {
+      // Exclude current course to avoid duplicating into same place (optional)
+      const option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = c.title;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error loading courses for duplication:', error);
+    alert('Failed to load courses. Please refresh and try again.');
+  }
+}
+
+async function confirmDuplicate() {
+  const targetSelect = document.getElementById('targetCourseSelect');
+  if (!targetSelect) return alert('Target course not selected');
+  const targetCourseId = targetSelect.value;
+  const copyReviewers = !!document.getElementById('duplicateReviewersCheckbox')?.checked;
+
+  if (!targetCourseId) return alert('Please select a target course');
+  if (!duplicateSubjectId) return alert('No subject selected to duplicate');
+
+  try {
+    // Fetch the original subject
+    const { data: subjectData, error: subjError } = await supabase
+      .from('subjects')
+      .select('*')
+      .eq('id', duplicateSubjectId)
+      .single();
+    if (subjError) throw subjError;
+
+    // Insert new subject into target course
+    const newSubject = {
+      title: subjectData.title,
+      description: subjectData.description,
+      color: subjectData.color || '#fd77ad',
+      course_id: targetCourseId
+    };
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('subjects')
+      .insert([newSubject])
+      .select('id')
+      .single();
+    if (insertError) throw insertError;
+
+    const newSubjectId = inserted.id || (inserted && inserted[0] && inserted[0].id);
+
+    // Optionally copy reviewers
+    if (copyReviewers) {
+      const { data: reviewers, error: revError } = await supabase
+        .from('reviewers')
+        .select('*')
+        .eq('subject_id', duplicateSubjectId);
+      if (revError) throw revError;
+
+      if (reviewers && reviewers.length > 0) {
+        // Prepare inserts: remove id and timestamps, set new subject_id
+        const toInsert = reviewers.map(r => {
+          const copy = { ...r };
+          delete copy.id;
+          delete copy.created_at;
+          delete copy.updated_at;
+          copy.subject_id = newSubjectId;
+          return copy;
+        });
+
+        const { error: insertRevError } = await supabase
+          .from('reviewers')
+          .insert(toInsert);
+        if (insertRevError) throw insertRevError;
+      }
+    }
+
+    // Close modal and refresh subjects
+    const dupModalEl = document.getElementById('duplicateModal');
+    const dupModal = bootstrap.Modal.getInstance(dupModalEl);
+    if (dupModal) dupModal.hide();
+    duplicateSubjectId = null;
+    alert('Subject duplicated successfully');
+  
+    // Reload the subjects grid if we're currently viewing the target course
+    if (targetCourseId === courseId) {
+      loadSubjects();
+    }
+
+  } catch (error) {
+    console.error('Error duplicating subject:', error);
+    alert('Failed to duplicate subject. Please try again.');
   }
 }
 

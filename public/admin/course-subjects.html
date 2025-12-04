@@ -147,6 +147,38 @@
     </div>
   </div>
 
+        <!-- Duplicate Subject Modal -->
+        <div class="modal fade" id="duplicateModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Duplicate Subject</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p>Select the course where you'd like to duplicate this subject.</p>
+                <div class="mb-3">
+                  <label for="targetCourseSelect" class="form-label">Target Course</label>
+                  <select id="targetCourseSelect" class="form-select"></select>
+                </div>
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" value="" id="duplicateReviewersCheckbox" checked>
+                  <label class="form-check-label" for="duplicateReviewersCheckbox">
+                    Also duplicate reviewers for this subject
+                  </label>
+                </div>
+                <div class="alert alert-warning small">Duplicate reviewers will copy content but not preserve original IDs or timestamps.</div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-pink" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-pink" onclick="confirmDuplicate()">
+                  <i class="bi bi-files"></i> Duplicate
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
