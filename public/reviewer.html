@@ -32,6 +32,7 @@
     .content-section table {
       width: 100%;
       margin: 1rem 0;
+      border-collapse: collapse;
     }
     
     .content-section table th {
@@ -39,9 +40,13 @@
       padding: 0.75rem;
     }
     
+    .content-section table th,
     .content-section table td {
       padding: 0.75rem;
-      border: 1px solid var(--pink-light);
+      border: 1px solid rgba(0,0,0,0.24);
+    }
+    .content-section table th {
+      background-color: var(--pink-light);
     }
     
     .content-section pre {

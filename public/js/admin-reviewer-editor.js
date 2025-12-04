@@ -68,26 +68,340 @@ document.addEventListener('DOMContentLoaded', async () => {
     const preview = document.getElementById('importPreview');
     if (preview) preview.textContent = `Selected file: ${importFileEl.files && importFileEl.files.length ? importFileEl.files[0].name : ''}`;
   });
+
+// Table modal bootstrap instance (kept in closure)
+let tableModalInstance = null;
+
+// helper to find available table module
+const getTableModule = () => {
+  try {
+    return (quill && (quill.getModule('better-table') || quill.getModule('table'))) || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// expose functions to global so inline onclick handlers work
+window.showTableInsertModal = function() {
+  const modalEl = document.getElementById('tableModal');
+  if (!tableModalInstance) tableModalInstance = new bootstrap.Modal(modalEl, { focus: false });
+  document.getElementById('tableRows').value = 4; // default 4
+  document.getElementById('tableCols').value = 4;
+  // blur the currently focused element (usually the trigger) to avoid focus being inside the modal while aria-hidden is true
+  try { if (document.activeElement) document.activeElement.blur(); } catch (e) {}
+
+  // show modal without letting Bootstrap auto-focus during the show transition
+  tableModalInstance.show();
+
+  // after modal is visible, set focus to the first focusable element inside it
+  const onShown = () => {
+    try {
+      const focusable = modalEl.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (focusable) focusable.focus();
+      else modalEl.focus();
+    } catch (e) {}
+    modalEl.removeEventListener('shown.bs.modal', onShown);
+  };
+  modalEl.addEventListener('shown.bs.modal', onShown);
+};
+
+window.insertTableFromModal = function() {
+  const rows = Math.max(1, parseInt(document.getElementById('tableRows').value) || 4);
+  const cols = Math.max(1, parseInt(document.getElementById('tableCols').value) || 4);
+  try {
+    const tableModule = getTableModule();
+    if (tableModule && typeof tableModule.insertTable === 'function') {
+      tableModule.insertTable(rows, cols);
+    } else if (quill && quill.getModule('table') && typeof quill.getModule('table').insertTable === 'function') {
+      quill.getModule('table').insertTable(rows, cols);
+    } else {
+      // fallback: insert a plain HTML table into the editor using the html-embed blot
+      const sel = quill.getSelection(true);
+      const idx = sel ? sel.index : quill.getLength();
+      let html = '<table border="1" style="border-collapse:collapse;width:100%;">';
+      for (let r = 0; r < rows; r++) {
+        html += '<tr>';
+        for (let c = 0; c < cols; c++) {
+          html += '<td>&nbsp;</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</table>';
+
+      try {
+        if (quill && quill.insertEmbed && window.__htmlEmbedRegistered) {
+          quill.insertEmbed(idx, 'html-embed', html, 'api');
+          // move cursor after embed
+          quill.setSelection(idx + 1, 0, 'api');
+        } else {
+          // last resort: paste raw HTML (may be sanitized by Quill)
+          quill.clipboard.dangerouslyPasteHTML(idx, html + '<p></p>');
+        }
+      } catch (e) {
+        // fallback to raw paste if embed insert fails
+        quill.clipboard.dangerouslyPasteHTML(idx, html + '<p></p>');
+      }
+    }
+  } catch (err) {
+    console.error('Insert table failed', err);
+    alert('Failed to insert table');
+  }
+  if (tableModalInstance) tableModalInstance.hide();
+};
+
+// Quick table actions: merge/unmerge, insert/remove rows/columns
+window.tableAction = function(action) {
+  try {
+    const tableModule = getTableModule();
+    if (tableModule) {
+      // prefer using table module APIs when available
+      switch (action) {
+        case 'insertRowAbove':
+          if (typeof tableModule.insertRowAbove === 'function') tableModule.insertRowAbove();
+          else if (typeof tableModule.insertRow === 'function') tableModule.insertRow(true);
+          break;
+        case 'insertRowBelow':
+          if (typeof tableModule.insertRowBelow === 'function') tableModule.insertRowBelow();
+          else if (typeof tableModule.insertRow === 'function') tableModule.insertRow(false);
+          break;
+        case 'insertColumnLeft':
+          if (typeof tableModule.insertColumnLeft === 'function') tableModule.insertColumnLeft();
+          else if (typeof tableModule.insertColumn === 'function') tableModule.insertColumn(true);
+          break;
+        case 'insertColumnRight':
+          if (typeof tableModule.insertColumnRight === 'function') tableModule.insertColumnRight();
+          else if (typeof tableModule.insertColumn === 'function') tableModule.insertColumn(false);
+          break;
+        case 'removeRow':
+          if (typeof tableModule.removeRow === 'function') tableModule.removeRow();
+          break;
+        case 'removeColumn':
+          if (typeof tableModule.removeColumn === 'function') tableModule.removeColumn();
+          break;
+        case 'merge':
+          if (typeof tableModule.mergeCells === 'function') tableModule.mergeCells();
+          break;
+        case 'unmerge':
+          if (typeof tableModule.unmergeCells === 'function') tableModule.unmergeCells();
+          break;
+        default:
+          console.warn('Unknown table action', action);
+      }
+      return;
+    }
+
+    // Fallback DOM-based table manipulation when no table module is available
+    const sel = document.getSelection();
+    const anchor = sel && sel.anchorNode;
+    const findAncestor = (node, tag) => {
+      while (node && node !== document) {
+        if (node.nodeType === 1 && node.tagName.toLowerCase() === tag) return node;
+        node = node.parentNode;
+      }
+      return null;
+    };
+
+    const table = findAncestor(anchor, 'table');
+    if (!table) {
+      alert('No table found at the cursor. Place the caret inside a table cell.');
+      return;
+    }
+
+    const cell = findAncestor(anchor, 'td') || findAncestor(anchor, 'th');
+    const row = cell ? cell.parentNode : null;
+    const rows = Array.from(table.rows);
+    const rowIndex = row ? rows.indexOf(row) : -1;
+    const cellIndex = cell ? Array.prototype.indexOf.call(row.children, cell) : -1;
+
+    const focusCell = (targetCell) => {
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(targetCell);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        targetCell.focus && targetCell.focus();
+      } catch (e) {}
+    };
+
+    switch (action) {
+      case 'insertRowAbove': {
+        if (rowIndex < 0) return alert('Cannot determine current row');
+        const cols = rows[0].cells.length;
+        const newRow = table.insertRow(rowIndex);
+        for (let i = 0; i < cols; i++) newRow.insertCell(i).innerHTML = '&nbsp;';
+        focusCell(newRow.cells[Math.max(0, cellIndex)]);
+        break;
+      }
+      case 'insertRowBelow': {
+        if (rowIndex < 0) return alert('Cannot determine current row');
+        const cols = rows[0].cells.length;
+        const newRow = table.insertRow(rowIndex + 1);
+        for (let i = 0; i < cols; i++) newRow.insertCell(i).innerHTML = '&nbsp;';
+        focusCell(newRow.cells[Math.max(0, cellIndex)]);
+        break;
+      }
+      case 'insertColumnLeft': {
+        if (cellIndex < 0) return alert('Cannot determine current column');
+        rows.forEach(r => {
+          const c = r.insertCell(cellIndex);
+          c.innerHTML = '&nbsp;';
+        });
+        // focus the cell in same row
+        const target = table.rows[rowIndex].cells[cellIndex];
+        if (target) focusCell(target);
+        break;
+      }
+      case 'insertColumnRight': {
+        if (cellIndex < 0) return alert('Cannot determine current column');
+        rows.forEach(r => {
+          const idx = Math.min(r.cells.length, cellIndex + 1);
+          const c = r.insertCell(idx);
+          c.innerHTML = '&nbsp;';
+        });
+        const target = table.rows[rowIndex].cells[cellIndex + 1];
+        if (target) focusCell(target);
+        break;
+      }
+      case 'removeRow': {
+        if (rowIndex < 0) return alert('Cannot determine current row');
+        table.deleteRow(rowIndex);
+        break;
+      }
+      case 'removeColumn': {
+        if (cellIndex < 0) return alert('Cannot determine current column');
+        rows.forEach(r => { if (r.cells[cellIndex]) r.deleteCell(cellIndex); });
+        break;
+      }
+      case 'merge':
+      case 'unmerge':
+        alert('Merge/unmerge is only available when using the table plugin.');
+        break;
+      default:
+        console.warn('Unknown table action', action);
+    }
+  } catch (err) {
+    console.error('Table action failed', err);
+    alert('Table action failed: ' + (err.message || err));
+  }
+};
   
   // Initialize Quill editor
+  // Register quill-better-table module (if loaded) to provide richer table support
+  if (window.Quill) {
+    let bt = window.QuillBetterTable || window.QuillBetterTableModule || window.betterTable || null;
+    if (bt && bt.default) bt = bt.default;
+    // some bundles export an object with a property 'QuillBetterTable' or 'BetterTable'
+    if (bt && typeof bt === 'object' && (bt.QuillBetterTable || bt.BetterTable)) bt = bt.QuillBetterTable || bt.BetterTable;
+    var registeredBetterTable = false;
+    if (bt) {
+      try {
+        Quill.register({ 'modules/better-table': bt }, true);
+        registeredBetterTable = true;
+      } catch (e) {
+        console.warn('Failed to register better-table module', e);
+      }
+    }
+  }
+
+  // Debug: expose registration status for quick diagnostics
+  try {
+    console.debug('better-table registered:', !!registeredBetterTable);
+    window.__registeredBetterTable = !!registeredBetterTable;
+  } catch (e) {}
+
+  // Build modules config dynamically depending on available modules
+  const modulesConfig = {
+    toolbar: {
+        container: [
+          [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          ['blockquote', 'code-block'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'script': 'sub'}, { 'script': 'super' }],
+          [{ 'indent': '-1'}, { 'indent': '+1' }],
+          [{ 'color': [] }, { 'background': [] }],
+          [{ 'align': [] }],
+          ['link', 'image', 'formula', 'table'],
+          ['clean']
+        ],
+        handlers: {
+          // Insert a simple 3x3 table via quill-better-table when toolbar 'table' clicked
+          'table': function() {
+            try {
+              const range = this.quill.getSelection();
+              const tableModule = this.quill.getModule('better-table');
+              if (tableModule && typeof tableModule.insertTable === 'function') {
+                tableModule.insertTable(3, 3);
+              } else if (this.quill.getModule('table')) {
+                // fallback to built-in table module (if present)
+                this.quill.getModule('table').insertTable(3, 3);
+              } else {
+                alert('Table module not available');
+              }
+            } catch (err) {
+              console.error('Insert table failed', err);
+            }
+          }
+        }
+      }
+  };
+
+  // include better-table config only if the module was registered successfully
+  if (typeof registeredBetterTable !== 'undefined' && registeredBetterTable) {
+    modulesConfig['better-table'] = {
+      operationMenu: {
+        items: {
+          unmergeCells: true,
+          insertRowAbove: true,
+          insertRowBelow: true,
+          insertColumnLeft: true,
+          insertColumnRight: true,
+          removeRow: true,
+          removeColumn: true,
+          removeTable: true
+        }
+      }
+    };
+  }
+
+  // Register a simple HTML embed blot so we can embed raw HTML (tables) when table plugin is not present
+  try {
+    const BlockEmbed = Quill.import && Quill.import('blots/block/embed');
+    if (BlockEmbed) {
+      class HtmlEmbed extends BlockEmbed {
+        static create(value) {
+          const node = super.create();
+          node.innerHTML = value || '';
+          return node;
+        }
+        static value(node) {
+          return node.innerHTML;
+        }
+      }
+      HtmlEmbed.blotName = 'html-embed';
+      HtmlEmbed.tagName = 'div';
+      Quill.register(HtmlEmbed, true);
+      window.__htmlEmbedRegistered = true;
+    }
+  } catch (e) {
+    console.warn('Failed to register html-embed blot', e);
+  }
+
+  // enable formula module (requires KaTeX loaded in the page)
+  modulesConfig.formula = true;
+
   quill = new Quill('#editor', {
     theme: 'snow',
-    modules: {
-      toolbar: [
-        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        ['blockquote', 'code-block'],
-        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-        [{ 'script': 'sub'}, { 'script': 'super' }],
-        [{ 'indent': '-1'}, { 'indent': '+1' }],
-        [{ 'color': [] }, { 'background': [] }],
-        [{ 'align': [] }],
-        ['link', 'image'],
-        ['clean']
-      ]
-    },
-    placeholder: 'Write your reviewer content here... You can add text, code blocks, tables, images, and more!'
+    modules: modulesConfig,
+    placeholder: 'Write your reviewer content here... You can add text, code blocks, tables, images, formulas, and more!'
   });
+
+  // Debug: show available table module (if any)
+  try {
+    console.debug('quill table module:', getTableModule());
+    window.__quillTableModule = getTableModule();
+  } catch (e) {}
 
   // Intercept paste to perform reliable auto-conversion (headers, bullets, bold)
   quill.root.addEventListener('paste', (e) => {
@@ -162,6 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   
 
+
   
   
   if (reviewerId) {
@@ -173,88 +488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-  // Markdown-like shortcuts: convert leading '### ' to header, '- ' to bullet list, and '**bold**' to bold
-  quill.on('text-change', (delta, oldDelta, source) => {
-    if (source !== 'user') return;
-
-    // Gather inserted string ops (handles typing and paste)
-    const insertedOps = (delta.ops || []).filter(op => typeof op.insert === 'string');
-    if (insertedOps.length === 0) return;
-
-    // Compute total inserted length and start index of insertion
-    const totalInsertedLen = insertedOps.reduce((sum, op) => sum + String(op.insert).length, 0);
-    const sel = quill.getSelection();
-    if (!sel) return;
-    let insertStart = Math.max(0, sel.index - totalInsertedLen);
-
-    // Collect actions to perform
-    // header/list actions: {pos, markerLen, kind:'header'|'list', attr}
-    // bold actions: {pos, innerLen, kind:'bold'}
-    const actions = [];
-    let pointer = insertStart;
-    for (const op of insertedOps) {
-      const text = String(op.insert);
-      const parts = text.split('\n');
-      let localOffset = 0;
-      for (let i = 0; i < parts.length; i++) {
-        const line = parts[i];
-        const trimmed = line.trimStart();
-        const leadingSpaces = line.length - line.replace(/^\s+/, '').length;
-        if (trimmed.startsWith('### ')) {
-          const markerPos = pointer + localOffset + leadingSpaces;
-          actions.push({ pos: markerPos, markerLen: 4, kind: 'header', attr: { header: 3 } });
-        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          const markerPos = pointer + localOffset + leadingSpaces;
-          actions.push({ pos: markerPos, markerLen: 2, kind: 'list', attr: { list: 'bullet' } });
-        }
-
-        // detect bold **text** in this line
-        const boldRegex = /\*\*(.+?)\*\*/g;
-        let boldMatch;
-        while ((boldMatch = boldRegex.exec(line)) !== null) {
-          const matchIndex = boldMatch.index;
-          const inner = boldMatch[1] || '';
-          const matchPos = pointer + localOffset + matchIndex;
-          actions.push({ kind: 'bold', pos: matchPos, innerLen: inner.length });
-        }
-
-        // advance localOffset by length of this part plus the newline (except last)
-        localOffset += line.length + 1; // +1 for the '\n' that was removed by split
-      }
-      pointer += text.length;
-    }
-
-    if (actions.length === 0) return;
-
-    // Apply actions in reverse order to avoid shifting positions
-    actions.sort((a, b) => b.pos - a.pos);
-    for (const act of actions) {
-      try {
-        if (act.kind === 'header' || act.kind === 'list') {
-          // remove marker (e.g., '### ' or '- ')
-          quill.deleteText(act.pos, act.markerLen, 'api');
-          // format the line at that position (formatLine with length 1 targets the line)
-          try {
-            quill.formatLine(act.pos, 1, act.attr, 'api');
-          } catch (e) {
-            quill.formatLine(Math.max(0, act.pos - 1), 1, act.attr, 'api');
-          }
-        } else if (act.kind === 'bold') {
-          // act.pos points to the start of the '**' marker
-          const leadingMarkerPos = act.pos;
-          const trailingMarkerPos = act.pos + 2 + act.innerLen; // position of trailing '**'
-          // delete trailing markers first
-          quill.deleteText(trailingMarkerPos, 2, 'api');
-          // delete leading markers
-          quill.deleteText(leadingMarkerPos, 2, 'api');
-          // apply bold to inner text (now starts at leadingMarkerPos)
-          quill.formatText(leadingMarkerPos, act.innerLen, { bold: true }, 'api');
-        }
-      } catch (err) {
-        console.warn('Shortcut action failed', err, act);
-      }
-    }
-  });
+  // (text-change handler is registered during initialization after Quill is created)
 
 // Handle logout
 async function handleLogout() {
