@@ -63,12 +63,12 @@ function displayNotification(notification) {
   activeNotifications.add(id);
   
   // Get time ago
-  const timeAgo = getTimeAgo(new Date(timestamp));
+  const timeAgo = getTimeAgoLocal(new Date(timestamp));
   
   // Sanitize content
-  const safeUsername = escapeHtml(username || 'Anonymous');
-  const safeMessage = escapeHtml(message);
-  const safeDeviceName = escapeHtml(deviceName || 'Unknown Device');
+  const safeUsername = escapeHtmlLocal(username || 'Anonymous');
+  const safeMessage = escapeHtmlLocal(message);
+  const safeDeviceName = escapeHtmlLocal(deviceName || 'Unknown Device');
   
   // Get icon based on type
   const isCommunity = type === 'community';
@@ -160,12 +160,8 @@ function openCommunityMessages() {
   }
 }
 
-// Format time ago (reuse from other modules if available)
-function getTimeAgo(date) {
-  if (typeof window.getTimeAgo === 'function') {
-    return window.getTimeAgo(date);
-  }
-  
+// Format time ago (use existing global function or create local version)
+function getTimeAgoLocal(date) {
   const seconds = Math.floor((new Date() - date) / 1000);
   
   if (seconds < 10) return 'just now';
@@ -183,12 +179,8 @@ function getTimeAgo(date) {
   return date.toLocaleDateString();
 }
 
-// Escape HTML to prevent XSS (reuse if available)
-function escapeHtml(text) {
-  if (typeof window.escapeHtml === 'function') {
-    return window.escapeHtml(text);
-  }
-  
+// Escape HTML to prevent XSS (use existing global function or create local version)
+function escapeHtmlLocal(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
