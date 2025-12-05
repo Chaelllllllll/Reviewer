@@ -153,7 +153,8 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
       options: {
         data: {
           display_name: displayName
-        }
+        },
+        emailRedirectTo: window.location.origin + '/signup.html'
       }
     });
     

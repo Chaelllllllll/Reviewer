@@ -170,7 +170,10 @@ document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: displayName } }
+      options: { 
+        data: { display_name: displayName },
+        emailRedirectTo: window.location.origin + '/index.html'
+      }
     });
     
     if (error) throw error;
