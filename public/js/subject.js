@@ -6,6 +6,13 @@ if (!subjectId) {
   window.location.href = '/index.html';
 }
 
+// Require authentication and username
+requireAuth().then(async (isAuth) => {
+  if (!isAuth) return;
+  await loadSubject();
+  await loadReviewers();
+});
+
 // Load subject details
 async function loadSubject() {
   try {
@@ -110,9 +117,3 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
-
-// Load data when page loads
-document.addEventListener('DOMContentLoaded', () => {
-  loadSubject();
-  loadReviewers();
-});

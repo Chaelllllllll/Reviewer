@@ -9,6 +9,13 @@ if (!quizReviewerId) {
   window.location.href = '/index.html';
 }
 
+// Require authentication and username
+requireAuth().then(async (isAuth) => {
+  if (!isAuth) return;
+  await loadReviewerTitle();
+  await loadQuiz();
+});
+
 async function loadReviewerTitle() {
   try {
     const { data: reviewer, error } = await supabase
@@ -395,9 +402,3 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
-
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadReviewerTitle();
-  await loadQuiz();
-});

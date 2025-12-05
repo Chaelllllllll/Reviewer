@@ -6,6 +6,12 @@ if (!reviewerId) {
   window.location.href = '/index.html';
 }
 
+// Require authentication and username
+requireAuth().then(async (isAuth) => {
+  if (!isAuth) return;
+  await loadReviewer();
+});
+
 // Load reviewer details
 async function loadReviewer() {
   try {
@@ -155,8 +161,3 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
-
-// Load data when page loads
-document.addEventListener('DOMContentLoaded', () => {
-  loadReviewer();
-});
