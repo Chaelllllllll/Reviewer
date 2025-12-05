@@ -617,7 +617,7 @@ function subscribeToDirectMessages(targetDeviceId) {
           const sender = activeDevices.find(d => d.device_id === payload.new.from_device_id);
           showMessageNotification({
             type: 'direct',
-            username: sender?.username || 'Anonymous',
+            username: sender?.display_name || 'User',
             message: payload.new.message || '',
             deviceName: sender?.device_name || 'Unknown Device',
             timestamp: payload.new.created_at || new Date().toISOString(),
@@ -718,7 +718,7 @@ async function initDeviceMessaging() {
             const sender = activeDevices.find(d => d.device_id === fromDeviceId);
             showMessageNotification({
               type: 'direct',
-              username: sender?.username || 'Anonymous',
+              username: sender?.display_name || 'User',
               message: payload.new.message || '',
               deviceName: sender?.device_name || 'Unknown Device',
               timestamp: payload.new.created_at || new Date().toISOString(),

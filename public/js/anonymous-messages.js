@@ -1201,16 +1201,16 @@ function subscribeToCommunityMessages() {
       event: 'INSERT',
       schema: 'public',
       table: 'anonymous_messages'
-    }, (payload) => {
+    }, async (payload) => {
       // Show notification preview if showMessageNotification is available
       // But DON'T show notification if this is the current user's message
-      const myUsername = getAnonymousUsername();
-      const isMyMessage = payload.new.username === myUsername;
+      const user = await getCurrentUser();
+      const isMyMessage = user && payload.new.user_id === user.id;
       
       if (!isMyMessage && typeof showMessageNotification === 'function' && payload.new) {
         showMessageNotification({
           type: 'community',
-          username: payload.new.username || 'Anonymous',
+          username: payload.new.sender_display_name || payload.new.username || 'User',
           message: payload.new.message || '',
           timestamp: payload.new.created_at || new Date().toISOString()
         });
