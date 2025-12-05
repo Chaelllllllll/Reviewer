@@ -8,7 +8,6 @@ let lastAdminMessageCount = 0;
 let adminMessageCheckInterval = null;
 let currentAdmin = null;
 let currentDmRecipient = null; // { id, username, is_admin }
-let dmModal = null; // Global DM modal instance
 
 // Initialize admin messaging
 async function initAdminMessages() {
@@ -554,33 +553,17 @@ async function openDirectMessage(userId, username, isAdmin = false) {
     dmModalLabel.innerHTML = `<i class="bi bi-chat-left-text-fill"></i> Message with ${sanitizeHTML(username)}`;
   }
   
-  // Initialize modal instance if not already created
+  // Show modal with higher z-index
   const dmModalEl = document.getElementById('dmModal');
-  if (!dmModal) {
-    dmModal = new bootstrap.Modal(dmModalEl);
-    
-    // Set up event listeners once
-    dmModalEl.addEventListener('shown.bs.modal', function() {
-      const backdrop = document.querySelector('.modal-backdrop');
-      if (backdrop) {
-        backdrop.style.zIndex = '1059';
-      }
-    });
-    
-    // Clean up backdrop when modal is hidden
-    dmModalEl.addEventListener('hidden.bs.modal', function() {
-      // Remove any leftover backdrops
-      const backdrops = document.querySelectorAll('.modal-backdrop');
-      backdrops.forEach(backdrop => backdrop.remove());
-      // Remove modal-open class if no other modals are open
-      const openModals = document.querySelectorAll('.modal.show');
-      if (openModals.length === 0) {
-        document.body.classList.remove('modal-open');
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
-      }
-    });
-  }
+  const dmModal = new bootstrap.Modal(dmModalEl);
+  
+  // Ensure backdrop appears above the community messages modal
+  dmModalEl.addEventListener('shown.bs.modal', function() {
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+      backdrop.style.zIndex = '1059';
+    }
+  }, { once: true });
   
   dmModal.show();
   
