@@ -802,7 +802,11 @@ function subscribeToCommunityMessages() {
       table: 'anonymous_messages'
     }, (payload) => {
       // Show notification preview if showMessageNotification is available
-      if (typeof showMessageNotification === 'function' && payload.new) {
+      // But DON'T show notification if this is the current user's message
+      const myDeviceId = generateDeviceId();
+      const isMyMessage = payload.new.device_id === myDeviceId;
+      
+      if (!isMyMessage && typeof showMessageNotification === 'function' && payload.new) {
         showMessageNotification({
           type: 'community',
           username: payload.new.username || 'Anonymous',
