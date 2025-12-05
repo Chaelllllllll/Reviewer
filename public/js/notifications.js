@@ -7,6 +7,7 @@ let lastCheckedCounts = {
   courses: 0,
   reviewers: 0
 };
+let serviceWorkerRegistration = null;
 
 // Request notification permission
 async function requestNotificationPermission() {
@@ -73,7 +74,31 @@ function showNotification(title, options = {}) {
   };
 
   try {
-    const notification = new Notification(title, defaultOptions);
+    // Use Service Worker for notifications if available (better mobile support)
+    if (serviceWorkerRegistration && serviceWorkerRegistration.showNotification) {
+      return serviceWorkerRegistration.showNotification(title, defaultOptions)
+        .then(() => {
+          // Notification shown successfully
+        })
+        .catch((error) => {
+          console.error('Service Worker notification error:', error);
+          // Fallback to regular notification
+          return showRegularNotification(title, defaultOptions);
+        });
+    } else {
+      // Fallback to regular notification API
+      return showRegularNotification(title, defaultOptions);
+    }
+  } catch (error) {
+    console.error('Error showing notification:', error);
+    return null;
+  }
+}
+
+// Regular notification fallback
+function showRegularNotification(title, options) {
+  try {
+    const notification = new Notification(title, options);
     
     // Handle notification click
     notification.onclick = function(event) {
@@ -393,6 +418,17 @@ function initNotifications() {
     return;
   }
 
+  // Register Service Worker for better mobile support
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        serviceWorkerRegistration = registration;
+      })
+      .catch((error) => {
+        console.error('Service Worker registration failed:', error);
+      });
+  }
+
   // If already granted, start checks
   if (Notification.permission === 'granted') {
     localStorage.setItem('notificationPromptShown', 'true');
@@ -454,28 +490,47 @@ window.testNotification = function() {
 function sendTestNotification() {
   try {
     const baseUrl = window.location.origin;
-    const notification = new Notification('🎉 Test Notification', {
+    const options = {
       body: 'Success! Your notifications are working correctly.',
       icon: `${baseUrl}/images/logo.png`,
       badge: `${baseUrl}/images/logo.png`,
       tag: 'test-notification',
       requireInteraction: false,
       vibrate: [200, 100, 200]
-    });
-    
-    notification.onclick = function() {
-      window.focus();
-      this.close();
     };
     
-    notification.onerror = function(error) {
-      console.error('Test notification error:', error);
-      alert('Error showing notification: ' + (error.message || 'Unknown error'));
-    };
+    // Use Service Worker if available
+    if (serviceWorkerRegistration && serviceWorkerRegistration.showNotification) {
+      serviceWorkerRegistration.showNotification('🎉 Test Notification', options)
+        .then(() => {
+          console.log('Test notification sent via Service Worker');
+        })
+        .catch((error) => {
+          console.error('Service Worker test failed:', error);
+          // Fallback to regular notification
+          showRegularTestNotification(options);
+        });
+    } else {
+      showRegularTestNotification(options);
+    }
   } catch (error) {
     console.error('Error creating test notification:', error);
     alert('Error creating notification: ' + error.message);
   }
+}
+
+function showRegularTestNotification(options) {
+  const notification = new Notification('🎉 Test Notification', options);
+  
+  notification.onclick = function() {
+    window.focus();
+    this.close();
+  };
+  
+  notification.onerror = function(error) {
+    console.error('Test notification error:', error);
+    alert('Error showing notification: ' + (error.message || 'Unknown error'));
+  };
 }
 
 window.resetNotificationPrompt = function() {
