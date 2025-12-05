@@ -367,39 +367,43 @@ body.dark-mode .admin-messages-container {
 }
 
 body.dark-mode .admin-message-wrapper {
-  background: linear-gradient(135deg, #3a2817 0%, #4a3517 100%) !important;
-  border-color: #FFA500 !important;
-  box-shadow: 0 3px 10px rgba(255, 165, 0, 0.3), 0 1px 3px rgba(255, 215, 0, 0.2) !important;
+  background: linear-gradient(135deg, #4a1f3a 0%, #5a2f4a 100%) !important;
+  border-color: #F06292 !important;
+  box-shadow: 0 3px 10px rgba(240, 98, 146, 0.3), 0 1px 3px rgba(233, 30, 99, 0.2) !important;
+}
+
+body.dark-mode .admin-message-wrapper::before {
+  border-color: #4a1f3a transparent transparent transparent !important;
 }
 
 body.dark-mode .admin-message-wrapper .message-content {
-  color: #ffd966 !important;
+  color: #ffc4dd !important;
 }
 
 body.dark-mode .mention-all-info-banner {
-  background: linear-gradient(135deg, #3a2817 0%, #4a3517 100%);
-  border-color: #FFA500;
+  background: linear-gradient(135deg, #3a1730 0%, #4a2740 100%);
+  border-color: #F06292;
 }
 
 body.dark-mode .mention-all-info-banner span {
-  color: #ffd966;
+  color: #ffc4dd;
 }
 
 body.dark-mode .mention-all-info-banner strong {
-  color: #FFD700;
-  background: rgba(255, 215, 0, 0.2);
+  color: #F06292;
+  background: rgba(240, 98, 146, 0.2);
 }
 
 body.dark-mode .mention-everyone {
-  background: linear-gradient(135deg, rgba(255, 165, 0, 0.3) 0%, rgba(255, 215, 0, 0.25) 100%);
-  border-color: rgba(255, 165, 0, 0.5);
-  color: #FFD700;
+  background: linear-gradient(135deg, rgba(240, 98, 146, 0.3) 0%, rgba(233, 30, 99, 0.25) 100%);
+  border-color: rgba(240, 98, 146, 0.5);
+  color: #F06292;
 }
 
 body.dark-mode .announcement-badge {
-  background: linear-gradient(135deg, #FFA500 0%, #FFD700 100%);
-  color: #1a1419;
-  box-shadow: 0 2px 6px rgba(255, 165, 0, 0.5);
+  background: linear-gradient(135deg, #E91E63 0%, #F06292 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(233, 30, 99, 0.5);
 }
 
 body.dark-mode #adminMessageInput {
