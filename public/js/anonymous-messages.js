@@ -579,14 +579,13 @@ async function sendMessage() {
   const sanitizedMessage = sanitizeInput(message);
 
   try {
-    // Insert message into database with device_id for sender identification
+    // Insert message into database
     const { error } = await supabase
       .from('anonymous_messages')
       .insert([
         {
           username: getAnonymousUsername(),
-          message: sanitizedMessage,
-          device_id: generateDeviceId()
+          message: sanitizedMessage
         }
       ]);
 
@@ -804,8 +803,8 @@ function subscribeToCommunityMessages() {
     }, (payload) => {
       // Show notification preview if showMessageNotification is available
       // But DON'T show notification if this is the current user's message
-      const myDeviceId = generateDeviceId();
-      const isMyMessage = payload.new.device_id === myDeviceId;
+      const myUsername = getAnonymousUsername();
+      const isMyMessage = payload.new.username === myUsername;
       
       if (!isMyMessage && typeof showMessageNotification === 'function' && payload.new) {
         showMessageNotification({
