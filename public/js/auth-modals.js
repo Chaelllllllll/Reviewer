@@ -167,6 +167,7 @@ document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
   signupSpinner.classList.remove('d-none');
   
   try {
+    // Sign up without sending Supabase confirmation email
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -174,6 +175,9 @@ document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
         data: { display_name: displayName },
         emailRedirectTo: window.location.origin + '/index.html'
       }
+    },
+    {
+      emailRedirectTo: false // Disable automatic confirmation email
     });
     
     if (error) throw error;

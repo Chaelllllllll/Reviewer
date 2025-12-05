@@ -146,7 +146,7 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
   errorAlert.classList.add('d-none');
   
   try {
-    // Create account with Supabase
+    // Create account with Supabase (without automatic confirmation email)
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -156,6 +156,9 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
         },
         emailRedirectTo: window.location.origin + '/signup.html'
       }
+    },
+    {
+      emailRedirectTo: false // Disable automatic confirmation email
     });
     
     if (error) {
