@@ -51,7 +51,7 @@
   max-height: 450px;
   min-height: 300px;
   overflow-y: auto;
-  padding: 0.75rem;
+  padding: 0.75rem 0.75rem 1.5rem 0.75rem;
   background: #f5f5f5;
   background-image: 
     repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.05) 35px, rgba(255,255,255,.05) 70px);
@@ -70,13 +70,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-}
-
-#messageModal .modal-body {
-  overflow: visible;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  padding: 0;
 }
 
 .tab-content {
@@ -95,6 +89,25 @@
   display: none;
   flex-direction: column;
   flex: 1;
+}
+
+/* Fix message input area - not sticky, inside modal */
+#communityTab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.message-input-area {
+  padding: 1rem;
+  background: var(--white);
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .message-input-area {
+  background: var(--bg-secondary);
+  border-top-color: var(--border-color);
 }
 
 #communityTab.active,
@@ -120,7 +133,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.5rem;
   animation: messageSlideIn 0.3s ease-out;
 }
 
@@ -205,6 +218,13 @@
   font-weight: 700;
   letter-spacing: 0.3px;
   text-transform: capitalize;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.message-username:hover {
+  color: #880E4F;
+  text-decoration: underline;
 }
 
 .message-username i {
@@ -235,6 +255,131 @@
   white-space: pre-wrap;
   margin: 0;
   font-weight: 400;
+}
+
+/* Message reactions */
+.message-reactions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.reaction-btn {
+  background: rgba(253, 119, 173, 0.1);
+  border: 1px solid rgba(253, 119, 173, 0.3);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reaction-btn:hover {
+  background: rgba(253, 119, 173, 0.2);
+  transform: scale(1.05);
+}
+
+.reaction-btn.reacted {
+  background: rgba(253, 119, 173, 0.3);
+  border-color: var(--pink-primary);
+}
+
+.reaction-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pink-primary);
+}
+
+.add-reaction-btn {
+  background: transparent;
+  border: 1px dashed rgba(153, 153, 153, 0.3);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.message-item:hover .add-reaction-btn {
+  opacity: 1;
+  height: auto;
+  padding: 4px 10px;
+  border: 1px dashed rgba(153, 153, 153, 0.3);
+}
+
+.message-bubble:hover .add-reaction-btn {
+  opacity: 1;
+  height: auto;
+  padding: 4px 10px;
+  border: 1px dashed rgba(153, 153, 153, 0.3);
+}
+
+.add-reaction-btn:hover {
+  background: rgba(253, 119, 173, 0.1);
+  border-color: var(--pink-primary);
+}
+
+/* Username click hint */
+.message-username {
+  color: #C2185B;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.message-username:hover {
+  color: var(--pink-primary);
+  text-decoration: underline;
+}
+
+/* Dark mode for reactions */
+body.dark-mode .reaction-btn {
+  background: rgba(253, 119, 173, 0.15);
+  border-color: rgba(253, 119, 173, 0.4);
+  color: var(--text-dark);
+}
+
+body.dark-mode .reaction-btn:hover {
+  background: rgba(253, 119, 173, 0.25);
+}
+
+body.dark-mode .reaction-btn.reacted {
+  background: rgba(253, 119, 173, 0.35);
+}
+
+/* Reaction Picker */
+.reaction-picker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 10001;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 300px;
+}
+
+body.dark-mode .reaction-picker {
+  background: var(--bg-secondary);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* Hover effect for messages */
@@ -347,10 +492,7 @@
   .messages-container {
     max-height: 350px;
     min-height: 250px;
-  }
-
-  .message-item {
-    padding: 0.875rem;
+    padding: 0.75rem 0.75rem 1.5rem 0.75rem;
   }
   
   #messageModal .modal-header,

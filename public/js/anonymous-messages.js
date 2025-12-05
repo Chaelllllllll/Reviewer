@@ -408,9 +408,27 @@ async function initFloatingMessages() {
   btn.id = 'floatingMessageBtn';
   btn.className = 'floating-message-btn';
   btn.innerHTML = '<i class="bi bi-chat-dots-fill"></i><span class="message-badge" id="messageBadge" style="display:none;">0</span>';
-  btn.title = 'Anonymous Messages';
+  btn.title = 'Chat with Community - Share Thoughts Anonymously!';
   btn.onclick = toggleMessageModal;
   document.body.appendChild(btn);
+  
+  // Add call-to-action hint (only show once per session)
+  if (!sessionStorage.getItem('messageHintShown')) {
+    setTimeout(() => {
+      const hint = document.createElement('div');
+      hint.className = 'message-button-hint';
+      hint.textContent = '💬 Join the conversation!';
+      document.body.appendChild(hint);
+      
+      // Hide hint after 10 seconds
+      setTimeout(() => {
+        hint.classList.add('hide');
+        setTimeout(() => hint.remove(), 500);
+      }, 10000);
+      
+      sessionStorage.setItem('messageHintShown', 'true');
+    }, 3000);
+  }
 
   // Create message modal
   createMessageModal();
@@ -482,7 +500,7 @@ function createMessageModal() {
                   <p class="small mt-3 mb-0">Loading messages...</p>
                 </div>
               </div>
-              <div class="px-3 pt-2 pb-3 border-top">
+              <div class="message-input-area">
                 <div id="messageError" class="alert alert-danger alert-sm mb-2" style="display:none;"></div>
                 <div class="input-group">
                   <input type="text" class="form-control border-2" id="messageInput" placeholder="Share your thoughts..." maxlength="500">
@@ -611,25 +629,91 @@ async function loadMessages() {
     container.innerHTML = messages.map(msg => {
       const date = new Date(msg.created_at);
       const timeAgo = getTimeAgo(date);
-      const sanitizedMessage = escapeHtml(msg.message);
       const sanitizedUsername = escapeHtml(msg.username);
+      const isAdmin = msg.is_admin || false;
       
-      return `
-        <div class="message-item">
-          <div class="message-avatar">
-            <i class="bi bi-person-fill"></i>
-          </div>
-          <div class="message-bubble">
-            <div class="message-header">
-              <strong class="message-username">${sanitizedUsername}</strong>
-            </div>
-            <div class="message-content-wrapper">
-              <div class="message-content">${sanitizedMessage}</div>
-            </div>
-            <small class="message-time">${timeAgo}</small>
-          </div>
+      // Parse reactions from JSON/JSONB
+      let reactions = {};
+      try {
+        reactions = msg.reactions ? (typeof msg.reactions === 'string' ? JSON.parse(msg.reactions) : msg.reactions) : {};
+      } catch (e) {
+        reactions = {};
+      }
+      
+      // Build reactions HTML
+      const reactionsHTML = Object.keys(reactions).length > 0 ? `
+        <div class="message-reactions">
+          ${Object.entries(reactions).map(([emoji, users]) => {
+            const count = users.length;
+            const hasReacted = users.includes(deviceId);
+            return `
+              <button class="reaction-btn ${hasReacted ? 'reacted' : ''}" onclick="toggleReaction('${msg.id}', '${emoji}')">
+                ${emoji} <span class="reaction-count">${count}</span>
+              </button>
+            `;
+          }).join('')}
+          <button class="add-reaction-btn" onclick="showReactionPicker('${msg.id}')">➕</button>
+        </div>
+      ` : `
+        <div class="message-reactions">
+          <button class="add-reaction-btn" onclick="showReactionPicker('${msg.id}')">➕ React</button>
         </div>
       `;
+      
+      if (isAdmin) {
+        // Admin message with pink theme
+        const avatarHTML = msg.avatar_url 
+          ? `<img src="${msg.avatar_url}" alt="Avatar" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; box-shadow: 0 3px 12px rgba(233, 30, 99, 0.4); border: 2px solid #E91E63;">` 
+          : `<i class="bi bi-person-fill"></i>`;
+        
+        // Highlight @everyone in message
+        let formattedMessage = escapeHtml(msg.message);
+        const hasEveryoneMention = msg.message.includes('@everyone');
+        formattedMessage = formattedMessage.replace(/@everyone/g, '<span class="mention-everyone">@everyone</span>');
+        
+        return `
+          <div class="message-item">
+            <div class="message-avatar admin-avatar">
+              ${avatarHTML}
+            </div>
+            <div class="message-bubble">
+              <div class="message-header">
+                <strong class="message-username admin-username" onclick="startDirectMessage('${msg.device_id}', '${sanitizedUsername}')" title="Click to send direct message to admin" style="cursor: pointer;">
+                  ${sanitizedUsername}
+                </strong>
+              </div>
+              <div class="message-content-wrapper admin-message-wrapper${hasEveryoneMention ? ' announcement-message' : ''}">
+                <div class="message-content">${formattedMessage}</div>
+              </div>
+              ${reactionsHTML}
+              <small class="message-time">${timeAgo}</small>
+            </div>
+          </div>
+        `;
+      } else {
+        // Regular anonymous message
+        const sanitizedMessage = escapeHtml(msg.message);
+        
+        return `
+          <div class="message-item">
+            <div class="message-avatar">
+              <i class="bi bi-person-fill"></i>
+            </div>
+            <div class="message-bubble">
+              <div class="message-header">
+                <strong class="message-username" onclick="window.startDirectMessage('${msg.device_id}', '${sanitizedUsername.replace(/'/g, "\\'")}'); return false;" title="Click to send direct message" style="cursor: pointer;">
+                  ${sanitizedUsername}
+                </strong>
+              </div>
+              <div class="message-content-wrapper">
+                <div class="message-content">${sanitizedMessage}</div>
+              </div>
+              ${reactionsHTML}
+              <small class="message-time">${timeAgo}</small>
+            </div>
+          </div>
+        `;
+      }
     }).join('');
     
     // Scroll to bottom to show newest messages
@@ -654,6 +738,12 @@ async function sendMessage() {
   
   if (!input) return;
 
+  // Rate limiting check
+  if (window.SecurityUtils && !window.SecurityUtils.rateLimiters.message.canMakeRequest(deviceId)) {
+    showError('Too many messages. Please wait a moment before sending another message.');
+    return;
+  }
+
   // Check if user is banned FIRST (non-bypassable)
   const banned = await checkBanStatus();
   if (banned || isBanned) {
@@ -669,6 +759,30 @@ async function sendMessage() {
   if (errorDiv) {
     errorDiv.style.display = 'none';
     errorDiv.textContent = '';
+  }
+
+  // Use SecurityUtils for validation if available
+  if (window.SecurityUtils) {
+    const validation = window.SecurityUtils.sanitizeMessage(message, 500);
+    if (!validation.valid) {
+      showError(validation.error);
+      if (validation.error.includes('prohibited')) {
+        const nowBanned = await logViolation();
+        if (nowBanned) {
+          showError('SECURITY ALERT: You have been PERMANENTLY BANNED for attempting malicious activity.', true);
+          input.disabled = true;
+          input.placeholder = 'Account banned - Security violation';
+          isBanned = true;
+        } else {
+          const remainingWarnings = 5 - violationCount;
+          showError(`SECURITY WARNING ${violationCount}/5: Prohibited content detected! ${remainingWarnings} warning(s) remaining before permanent ban.`, false);
+        }
+      }
+      input.value = '';
+      return;
+    }
+    // Use sanitized message
+    const sanitizedMessage = validation.message;
   }
 
   // Validate message
@@ -725,7 +839,8 @@ async function sendMessage() {
       .insert([
         {
           username: getAnonymousUsername(),
-          message: sanitizedMessage
+          message: sanitizedMessage,
+          device_id: deviceId
         }
       ]);
 
@@ -822,18 +937,32 @@ async function checkNewMessages() {
 // Update message badge
 function updateMessageBadge(newCount) {
   const badge = document.getElementById('messageBadge');
+  const btn = document.getElementById('floatingMessageBtn');
+  
   if (badge && newCount > 0) {
     badge.textContent = newCount > 99 ? '99+' : newCount;
     badge.style.display = 'inline-block';
+    
+    // Add special class for extra attention
+    if (btn) {
+      btn.classList.add('has-new-messages');
+    }
   }
 }
 
 // Reset message badge
 function resetMessageBadge() {
   const badge = document.getElementById('messageBadge');
+  const btn = document.getElementById('floatingMessageBtn');
+  
   if (badge) {
     badge.style.display = 'none';
     badge.textContent = '0';
+  }
+  
+  // Remove special class
+  if (btn) {
+    btn.classList.remove('has-new-messages');
   }
 }
 
@@ -995,6 +1124,128 @@ if (document.readyState === 'loading') {
 // Expose functions globally
 window.sendMessage = sendMessage;
 window.toggleMessageModal = toggleMessageModal;
+
+// Reaction functions
+window.showReactionPicker = function(messageId) {
+  const reactions = ['❤️', '👍', '😂', '😮', '😢', '🙏', '🔥', '🎉'];
+  const picker = document.createElement('div');
+  picker.className = 'reaction-picker';
+  picker.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); z-index: 10001; display: flex; gap: 10px; flex-wrap: wrap; max-width: 300px;';
+  
+  reactions.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.textContent = emoji;
+    btn.style.cssText = 'font-size: 32px; background: none; border: none; cursor: pointer; padding: 8px; border-radius: 8px; transition: transform 0.2s;';
+    btn.onmouseover = () => btn.style.transform = 'scale(1.3)';
+    btn.onmouseout = () => btn.style.transform = 'scale(1)';
+    btn.onclick = () => {
+      toggleReaction(messageId, emoji);
+      document.body.removeChild(picker);
+      document.body.removeChild(overlay);
+    };
+    picker.appendChild(btn);
+  });
+  
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000;';
+  overlay.onclick = () => {
+    document.body.removeChild(picker);
+    document.body.removeChild(overlay);
+  };
+  
+  document.body.appendChild(overlay);
+  document.body.appendChild(picker);
+};
+
+window.toggleReaction = async function(messageId, emoji) {
+  try {
+    // Get current message
+    const { data: msg, error: fetchError } = await supabase
+      .from('anonymous_messages')
+      .select('reactions')
+      .eq('id', messageId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    let reactions = {};
+    try {
+      reactions = msg.reactions ? (typeof msg.reactions === 'string' ? JSON.parse(msg.reactions) : msg.reactions) : {};
+    } catch (e) {
+      reactions = {};
+    }
+    
+    // Toggle reaction
+    if (!reactions[emoji]) {
+      reactions[emoji] = [];
+    }
+    
+    const userIndex = reactions[emoji].indexOf(deviceId);
+    if (userIndex > -1) {
+      reactions[emoji].splice(userIndex, 1);
+      if (reactions[emoji].length === 0) {
+        delete reactions[emoji];
+      }
+    } else {
+      reactions[emoji].push(deviceId);
+    }
+    
+    // Update in database
+    const { error: updateError } = await supabase
+      .from('anonymous_messages')
+      .update({ reactions: reactions })
+      .eq('id', messageId);
+    
+    if (updateError) throw updateError;
+    
+    // Reload messages to show updated reactions
+    loadMessages();
+  } catch (error) {
+    console.error('Error toggling reaction:', error);
+  }
+};
+
+window.startDirectMessage = function(targetDeviceId, targetUsername) {
+  console.log('startDirectMessage called:', targetDeviceId, targetUsername);
+  
+  // Don't allow DM to self
+  if (targetDeviceId === deviceId) {
+    alert('You cannot send a message to yourself!');
+    return;
+  }
+  
+  // Open the message modal first
+  const messageModal = document.getElementById('messageModal');
+  console.log('Message modal element:', messageModal);
+  
+  if (messageModal) {
+    // Check if modal is already shown
+    const existingModal = bootstrap.Modal.getInstance(messageModal);
+    if (existingModal) {
+      existingModal.show();
+    } else {
+      const modal = new bootstrap.Modal(messageModal);
+      modal.show();
+    }
+    
+    // Switch to direct messages tab after modal is shown
+    setTimeout(() => {
+      window.switchMessageTab('direct');
+      
+      // Wait for tab to load, then select the device
+      setTimeout(() => {
+        if (typeof window.selectDeviceForDM === 'function') {
+          window.selectDeviceForDM(targetDeviceId, targetUsername);
+        } else {
+          console.error('selectDeviceForDM function not found');
+        }
+      }, 300);
+    }, 100);
+  } else {
+    console.error('Message modal not found! Make sure the modal is created.');
+    alert('Message modal is not ready. Please try clicking the message button first.');
+  }
+};
 
 // Switch between message tabs
 window.switchMessageTab = function(tabName) {

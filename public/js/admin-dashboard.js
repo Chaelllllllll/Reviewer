@@ -1,6 +1,9 @@
 let courseModal;
 let deleteModal;
 let deleteCourseId = null;
+let profileModal;
+let currentUser = null;
+let uploadedAvatarFile = null;
 
 // Check authentication on page load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -8,8 +11,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   courseModal = new bootstrap.Modal(document.getElementById('courseModal'));
   deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+  profileModal = new bootstrap.Modal(document.getElementById('profileModal'));
   
   loadCourses();
+  loadUserProfile();
+  
+  // Load profile when modal is opened
+  document.getElementById('profileModal').addEventListener('show.bs.modal', loadUserProfile);
 });
 
 // Handle logout
@@ -185,4 +193,206 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Profile Management Functions
+
+// Load user profile
+async function loadUserProfile() {
+  try {
+    currentUser = await getCurrentUser();
+    if (!currentUser) return;
+
+    // Display email
+    const emailDisplay = document.getElementById('emailDisplay');
+    if (emailDisplay) {
+      emailDisplay.value = currentUser.email;
+    }
+
+    // Load profile from database
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', currentUser.id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error loading profile:', error);
+      return;
+    }
+
+    if (profile) {
+      // Set username
+      const usernameInput = document.getElementById('usernameInput');
+      if (usernameInput) {
+        usernameInput.value = profile.username || '';
+      }
+
+      // Set avatar
+      const avatarPreview = document.getElementById('avatarPreview');
+      if (profile.avatar_url && avatarPreview) {
+        avatarPreview.innerHTML = `<img src="${profile.avatar_url}" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--pink-primary);">`;
+      }
+    } else {
+      // Create profile if doesn't exist
+      const defaultUsername = currentUser.email.split('@')[0];
+      const usernameInput = document.getElementById('usernameInput');
+      if (usernameInput) {
+        usernameInput.value = defaultUsername;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading user profile:', error);
+  }
+}
+
+// Handle avatar upload
+async function handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validate file
+  if (!file.type.startsWith('image/')) {
+    showProfileAlert('Please select an image file', 'danger');
+    return;
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    showProfileAlert('Image size must be less than 2MB', 'danger');
+    return;
+  }
+
+  // Preview image
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const avatarPreview = document.getElementById('avatarPreview');
+    if (avatarPreview) {
+      avatarPreview.innerHTML = `<img src="${e.target.result}" alt="Avatar" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--pink-primary);">`;
+    }
+  };
+  reader.readAsDataURL(file);
+
+  // Store file for upload
+  uploadedAvatarFile = file;
+}
+
+// Save profile
+async function saveProfile() {
+  try {
+    const usernameInput = document.getElementById('usernameInput');
+    const username = usernameInput ? usernameInput.value.trim() : '';
+
+    if (!username) {
+      showProfileAlert('Username is required', 'warning');
+      return;
+    }
+
+    if (username.length < 3) {
+      showProfileAlert('Username must be at least 3 characters', 'warning');
+      return;
+    }
+
+    // Show loading
+    const saveBtn = document.querySelector('#profileModal .btn-pink');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+    let avatarUrl = null;
+
+    // Upload avatar if a new one was selected
+    if (uploadedAvatarFile) {
+      const fileExt = uploadedAvatarFile.name.split('.').pop();
+      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('profiles')
+        .upload(filePath, uploadedAvatarFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        showProfileAlert('Failed to upload avatar', 'danger');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('profiles')
+        .getPublicUrl(filePath);
+
+      avatarUrl = urlData.publicUrl;
+    }
+
+    // Update or insert profile
+    const profileData = {
+      id: currentUser.id,
+      username: username,
+      updated_at: new Date().toISOString()
+    };
+
+    if (avatarUrl) {
+      profileData.avatar_url = avatarUrl;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(profileData);
+
+    if (error) throw error;
+
+    // Reset upload file
+    uploadedAvatarFile = null;
+
+    // Show success
+    showProfileAlert('Profile updated successfully!', 'success');
+    
+    // Reset button
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = originalText;
+
+    // Close modal after 1 second
+    setTimeout(() => {
+      profileModal.hide();
+      // Reload messages if admin messages are open
+      if (typeof loadAdminMessages === 'function') {
+        loadAdminMessages();
+      }
+    }, 1000);
+
+  } catch (error) {
+    console.error('Error saving profile:', error);
+    showProfileAlert('Failed to save profile. Please try again.', 'danger');
+    
+    const saveBtn = document.querySelector('#profileModal .btn-pink');
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="bi bi-save"></i> Save Changes';
+  }
+}
+
+// Show profile alert
+function showProfileAlert(message, type = 'info') {
+  const container = document.getElementById('profileAlertContainer');
+  if (!container) return;
+
+  const alert = document.createElement('div');
+  alert.className = `alert alert-${type} alert-dismissible fade show`;
+  alert.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+
+  container.innerHTML = '';
+  container.appendChild(alert);
+
+  if (type === 'success') {
+    setTimeout(() => {
+      alert.remove();
+    }, 3000);
+  }
 }

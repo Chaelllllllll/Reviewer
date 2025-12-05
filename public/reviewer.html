@@ -16,12 +16,14 @@
   <!-- Custom CSS -->
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/anonymous-messages.css">
+  <link rel="stylesheet" href="/css/admin-messages.css">
   <link rel="stylesheet" href="/css/device-messaging.css">
   <link rel="stylesheet" href="/css/notifications.css">
   <link rel="stylesheet" href="/css/message-notifications.css">
   <link rel="stylesheet" href="/css/anti-cheat-notifications.css">
   <link rel="stylesheet" href="/css/install-prompt.css">
   <link rel="stylesheet" href="/css/support-notifications.css">
+  <link rel="stylesheet" href="/css/floating-message-button.css">
   
   <style>
     .content-section {
@@ -166,11 +168,15 @@
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
+
+  <!-- DOMPurify for XSS Protection -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <!-- Dark Mode -->
+
+  <!-- Security Utilities -->
+  <script src="/js/security-utils.js"></script>  <!-- Dark Mode -->
   <script src="/js/dark-mode.js"></script>
   
   <!-- Anti-Cheat Notifications -->

@@ -1,0 +1,316 @@
+/* Floating Message Button - Attractive Design */
+
+.floating-message-btn {
+  position: fixed;
+  bottom: 95px;
+  right: 20px;
+  width: 65px;
+  height: 65px;
+  background: linear-gradient(135deg, #fd77ad 0%, #ff6b9d 50%, #ff5a8d 100%);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  z-index: 999;
+  box-shadow: 0 8px 25px rgba(253, 119, 173, 0.5);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse-button 2s infinite, float-up-down 3s ease-in-out infinite;
+}
+
+.floating-message-btn::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fd77ad 0%, #ff6b9d 50%, #ff5a8d 100%);
+  opacity: 0.4;
+  animation: ripple-effect 2s infinite;
+}
+
+.floating-message-btn::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  bottom: -3px;
+  left: -3px;
+  border-radius: 50%;
+  border: 3px solid rgba(253, 119, 173, 0.3);
+  animation: rotate-border 3s linear infinite;
+}
+
+.floating-message-btn i {
+  position: relative;
+  z-index: 1;
+  animation: bounce-icon 2s ease-in-out infinite;
+}
+
+.floating-message-btn:hover {
+  transform: scale(1.15) rotate(5deg);
+  box-shadow: 0 12px 35px rgba(253, 119, 173, 0.7);
+  background: linear-gradient(135deg, #ff8dbf 0%, #ff7aaf 50%, #ff6b9f 100%);
+}
+
+.floating-message-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 4px 15px rgba(253, 119, 173, 0.4);
+}
+
+/* Message Badge - New Messages Indicator */
+.message-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: linear-gradient(135deg, #ff3366, #ff0055);
+  color: white;
+  border-radius: 12px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: center;
+  z-index: 2;
+  box-shadow: 0 3px 10px rgba(255, 0, 85, 0.5);
+  animation: badge-pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55), badge-pulse 2s infinite;
+}
+
+/* Tooltip on hover */
+.floating-message-btn[title]:hover::before {
+  opacity: 0;
+}
+
+.floating-message-btn::after {
+  animation: none;
+}
+
+.floating-message-btn:hover::after {
+  animation: rotate-border 1s linear infinite;
+}
+
+/* Attention-grabbing glow effect */
+@keyframes pulse-button {
+  0%, 100% {
+    box-shadow: 0 8px 25px rgba(253, 119, 173, 0.5);
+  }
+  50% {
+    box-shadow: 0 8px 35px rgba(253, 119, 173, 0.8), 0 0 20px rgba(253, 119, 173, 0.4);
+  }
+}
+
+/* Subtle floating animation */
+@keyframes float-up-down {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Ripple effect */
+@keyframes ripple-effect {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Rotating border */
+@keyframes rotate-border {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Icon bounce */
+@keyframes bounce-icon {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-3px);
+  }
+  75% {
+    transform: translateY(3px);
+  }
+}
+
+/* Badge pop-in animation */
+@keyframes badge-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Badge pulse */
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* Sparkle effect on button */
+.floating-message-btn.has-new-messages {
+  animation: pulse-button 1.5s infinite, float-up-down 3s ease-in-out infinite, sparkle 1.5s infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.2) saturate(1.3);
+  }
+}
+
+/* Add shine effect */
+.floating-message-btn::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 60%);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+/* Dark mode adjustments */
+body.dark-mode .floating-message-btn {
+  box-shadow: 0 8px 25px rgba(253, 119, 173, 0.6);
+}
+
+body.dark-mode .floating-message-btn:hover {
+  box-shadow: 0 12px 35px rgba(253, 119, 173, 0.8);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .floating-message-btn {
+    bottom: 85px;
+    right: 15px;
+    width: 58px;
+    height: 58px;
+    font-size: 24px;
+  }
+  
+  .message-badge {
+    top: 3px;
+    right: 3px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+}
+
+/* Accessibility - Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .floating-message-btn,
+  .floating-message-btn::before,
+  .floating-message-btn::after,
+  .floating-message-btn i,
+  .message-badge {
+    animation: none !important;
+  }
+  
+  .floating-message-btn {
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+}
+
+/* Call-to-action hint (appears after 3 seconds on first visit) */
+.message-button-hint {
+  position: fixed;
+  bottom: 170px;
+  right: 20px;
+  background: white;
+  color: #333;
+  padding: 10px 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 998;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: hint-appear 0.5s ease forwards 3s, hint-wiggle 2s ease-in-out 3.5s infinite;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.message-button-hint::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  right: 20px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid white;
+}
+
+body.dark-mode .message-button-hint {
+  background: #2a2a2a;
+  color: #e8e8e8;
+}
+
+body.dark-mode .message-button-hint::after {
+  border-top-color: #2a2a2a;
+}
+
+@keyframes hint-appear {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hint-wiggle {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* Hide hint after 10 seconds */
+.message-button-hint.hide {
+  animation: hint-disappear 0.5s ease forwards;
+}
+
+@keyframes hint-disappear {
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
