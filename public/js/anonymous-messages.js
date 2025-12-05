@@ -579,13 +579,14 @@ async function sendMessage() {
   const sanitizedMessage = sanitizeInput(message);
 
   try {
-    // Insert message into database
+    // Insert message into database with device_id for sender identification
     const { error } = await supabase
       .from('anonymous_messages')
       .insert([
         {
           username: getAnonymousUsername(),
-          message: sanitizedMessage
+          message: sanitizedMessage,
+          device_id: generateDeviceId()
         }
       ]);
 
