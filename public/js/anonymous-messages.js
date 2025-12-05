@@ -801,8 +801,6 @@ function subscribeToCommunityMessages() {
       schema: 'public',
       table: 'anonymous_messages'
     }, (payload) => {
-      console.log('New community message received:', payload);
-      
       // Show notification preview if showMessageNotification is available
       if (typeof showMessageNotification === 'function' && payload.new) {
         showMessageNotification({
@@ -817,8 +815,6 @@ function subscribeToCommunityMessages() {
       loadMessages();
     })
     .subscribe();
-  
-  console.log('Subscribed to community messages');
 }
 
 // Unsubscribe from community messages
@@ -826,7 +822,6 @@ function unsubscribeFromCommunityMessages() {
   if (communityMessagesChannel) {
     communityMessagesChannel.unsubscribe();
     communityMessagesChannel = null;
-    console.log('Unsubscribed from community messages');
   }
 }
 

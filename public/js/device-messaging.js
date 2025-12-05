@@ -43,8 +43,6 @@ async function trackDevicePresence() {
     const deviceName = getDeviceName();
     const username = getAnonymousUsername();
     
-    console.log('Tracking presence:', { devId: devId.substring(0, 10) + '...', deviceName, username });
-    
     const { error } = await supabase
       .from('user_presence')
       .upsert({
@@ -70,25 +68,7 @@ async function getActiveDevices() {
     const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
     const myDeviceId = generateDeviceId();
     
-    console.log('My device ID:', myDeviceId.substring(0, 15) + '...', 'Time cutoff:', fifteenSecondsAgo);
-    
-    // First get all recent presence records for debugging
-    const { data: allData, error: allError } = await supabase
-      .from('user_presence')
-      .select('device_id, username, device_name, last_seen')
-      .gte('last_seen', fifteenSecondsAgo)
-      .order('last_seen', { ascending: false });
-    
-    if (allError) throw allError;
-    
-    console.log('All online devices:', allData?.length || 0, allData?.map(d => ({
-      id: d.device_id.substring(0, 15) + '...',
-      username: d.username,
-      device: d.device_name,
-      lastSeen: new Date(d.last_seen).toLocaleTimeString()
-    })));
-    
-    // Now filter out current device
+    // Get active devices excluding current device
     const { data, error } = await supabase
       .from('user_presence')
       .select('*')
@@ -100,7 +80,6 @@ async function getActiveDevices() {
     if (error) throw error;
     
     activeDevices = data || [];
-    console.log('Active devices (excluding me):', activeDevices.length);
     
     return activeDevices;
   } catch (error) {
@@ -509,8 +488,6 @@ function subscribeToDirectMessages(targetDeviceId) {
   
   const myDeviceId = generateDeviceId();
   
-  console.log('Subscribing to direct messages with:', targetDeviceId.substring(0, 10) + '...');
-  
   // Subscribe to new messages in this conversation
   directMessageChannel = supabase
     .channel(`dm:${myDeviceId}:${targetDeviceId}`)
@@ -520,7 +497,6 @@ function subscribeToDirectMessages(targetDeviceId) {
       table: 'direct_messages',
       filter: `to_device_id=eq.${myDeviceId}`
     }, (payload) => {
-      console.log('New direct message received:', payload);
       // Only update if message is from current conversation partner
       if (payload.new.from_device_id === targetDeviceId) {
         loadConversation(targetDeviceId);
@@ -549,20 +525,16 @@ function subscribeToDirectMessages(targetDeviceId) {
       table: 'direct_messages',
       filter: `from_device_id=eq.${myDeviceId}`
     }, (payload) => {
-      console.log('My message confirmed:', payload);
       // Refresh conversation to show sent message immediately
       if (payload.new.to_device_id === targetDeviceId) {
         loadConversation(targetDeviceId);
       }
     })
-    .subscribe((status) => {
-      console.log('Direct message subscription status:', status);
-    });
+    .subscribe();
 }
 
 // Refresh device list manually
 async function refreshDeviceList() {
-  console.log('Refreshing device list...');
   await trackDevicePresence();
   await getActiveDevices();
   await updateUnreadCounts();

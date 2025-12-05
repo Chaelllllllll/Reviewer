@@ -189,5 +189,3 @@ function escapeHtmlLocal(text) {
 // Expose functions globally
 window.showMessageNotification = showMessageNotification;
 window.dismissNotification = dismissNotification;
-
-console.log('Message notifications module loaded');

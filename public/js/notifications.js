@@ -36,8 +36,6 @@ async function requestNotificationPermission() {
       // Show confirmation notification
       showNotification('Notifications Enabled', {
         body: 'You will now receive updates about new messages, subjects, courses, and reviewers!',
-        icon: '/images/logo.png',
-        badge: '/images/logo.png',
         tag: 'notification-enabled'
       });
       
@@ -56,13 +54,21 @@ async function requestNotificationPermission() {
 
 // Show notification
 function showNotification(title, options = {}) {
-  if (Notification.permission !== 'granted') return;
+  if (Notification.permission !== 'granted') {
+    return;
+  }
+
+  // Get absolute URL for icons
+  const baseUrl = window.location.origin;
+  const iconUrl = options.icon || `${baseUrl}/images/logo.png`;
+  const badgeUrl = options.badge || `${baseUrl}/images/logo.png`;
 
   const defaultOptions = {
-    icon: '/images/logo.png',
-    badge: '/images/logo.png',
+    icon: iconUrl,
+    badge: badgeUrl,
     vibrate: [200, 100, 200],
     requireInteraction: false,
+    silent: false,
     ...options
   };
 
@@ -94,6 +100,10 @@ function showNotification(title, options = {}) {
       }
       
       notification.close();
+    };
+
+    notification.onerror = function(error) {
+      console.error('Notification error:', error);
     };
 
     return notification;
@@ -443,10 +453,11 @@ window.testNotification = function() {
 
 function sendTestNotification() {
   try {
+    const baseUrl = window.location.origin;
     const notification = new Notification('🎉 Test Notification', {
       body: 'Success! Your notifications are working correctly.',
-      icon: '/images/logo.png',
-      badge: '/images/logo.png',
+      icon: `${baseUrl}/images/logo.png`,
+      badge: `${baseUrl}/images/logo.png`,
       tag: 'test-notification',
       requireInteraction: false,
       vibrate: [200, 100, 200]
@@ -456,7 +467,13 @@ function sendTestNotification() {
       window.focus();
       this.close();
     };
+    
+    notification.onerror = function(error) {
+      console.error('Test notification error:', error);
+      alert('Error showing notification: ' + (error.message || 'Unknown error'));
+    };
   } catch (error) {
+    console.error('Error creating test notification:', error);
     alert('Error creating notification: ' + error.message);
   }
 }

@@ -2,8 +2,8 @@
 
 .message-notification-container {
   position: fixed;
-  bottom: 90px;
-  right: 100px;
+  bottom: 100px;
+  right: 110px; /* Positioned to the left of the message button (30px + 60px width + 20px gap) */
   z-index: 9999;
   pointer-events: none;
 }
