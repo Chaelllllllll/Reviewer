@@ -299,10 +299,46 @@ async function confirmDuplicate() {
           return copy;
         });
 
-        const { error: insertRevError } = await supabase
+        const { data: insertedReviewers, error: insertRevError } = await supabase
           .from('reviewers')
-          .insert(toInsert);
+          .insert(toInsert)
+          .select('id');
         if (insertRevError) throw insertRevError;
+
+        // Copy quizzes for each reviewer
+        if (insertedReviewers && insertedReviewers.length > 0) {
+          for (let i = 0; i < reviewers.length; i++) {
+            const originalReviewerId = reviewers[i].id;
+            const newReviewerId = insertedReviewers[i].id;
+
+            // Fetch quizzes from original reviewer
+            const { data: quizzes, error: quizError } = await supabase
+              .from('quizzes')
+              .select('*')
+              .eq('reviewer_id', originalReviewerId);
+            
+            if (!quizError && quizzes && quizzes.length > 0) {
+              // Prepare quiz inserts
+              const quizzesToInsert = quizzes.map(q => {
+                const copy = { ...q };
+                delete copy.id;
+                delete copy.created_at;
+                delete copy.updated_at;
+                copy.reviewer_id = newReviewerId;
+                return copy;
+              });
+
+              // Insert quizzes for new reviewer
+              const { error: insertQuizError } = await supabase
+                .from('quizzes')
+                .insert(quizzesToInsert);
+              
+              if (insertQuizError) {
+                console.error('Error duplicating quizzes:', insertQuizError);
+              }
+            }
+          }
+        }
       }
     }
 
