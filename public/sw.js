@@ -1,15 +1,26 @@
 // Service Worker for Push Notifications
-const CACHE_NAME = 'thinky-v1';
+const CACHE_NAME = 'thinky-v2'; // Increment this to force update
 
 // Install event
 self.addEventListener('install', (event) => {
+  console.log('Service Worker installing...');
   self.skipWaiting();
 });
 
 // Activate event
 self.addEventListener('activate', (event) => {
+  console.log('Service Worker activating...');
   event.waitUntil(
-    clients.claim()
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => clients.claim())
   );
 });
 
