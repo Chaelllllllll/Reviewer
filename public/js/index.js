@@ -32,6 +32,15 @@ async function initializeUserNav() {
       await signOut();
       window.location.href = '/index.html';
     });
+  } else {
+    // Add login button for non-authenticated users
+    navbarMenu.innerHTML += `
+      <li class="nav-item">
+        <button class="btn btn-pink" data-bs-toggle="modal" data-bs-target="#authModal">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Login
+        </button>
+      </li>
+    `;
   }
 }
 

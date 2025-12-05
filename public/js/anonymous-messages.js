@@ -955,7 +955,14 @@ async function sendMessage() {
     }
     
     const profile = await getCurrentUserProfile();
-    const displayName = profile?.username || user?.user_metadata?.display_name || 'User';
+    const displayName = profile?.username || '';
+    
+    // Check if username is set
+    if (!displayName || displayName.trim() === '') {
+      showError('Please set your display name in your profile before sending messages.');
+      return;
+    }
+    
     const messageData = {
       username: displayName,
       message: sanitizedMessage,
@@ -1246,7 +1253,7 @@ window.addEventListener('beforeunload', () => {
             supabase.from('user_presence').upsert({ 
               device_id: devId, 
               user_id: user.id,
-              display_name: profile?.username || user?.user_metadata?.display_name || 'User',
+              display_name: profile?.username || 'User',
               last_seen: new Date().toISOString() 
             }, { onConflict: 'device_id' });
           });

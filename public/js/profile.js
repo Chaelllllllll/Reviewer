@@ -11,20 +11,23 @@ requireAuth().then(async (isAuth) => {
 // Load user profile
 async function loadProfile() {
   try {
+    const user = await getCurrentUser();
     currentProfile = await getCurrentUserProfile();
     
-    if (!currentProfile) {
+    if (!currentProfile || !user) {
       throw new Error('Profile not found');
     }
     
+    const userEmail = user.email;
+    
     // Update UI
-    const profilePic = currentProfile.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentProfile.display_name || currentProfile.email)}&size=150`;
+    const profilePic = currentProfile.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentProfile.username || userEmail)}&size=150`;
     
     document.getElementById('profilePicture').src = profilePic;
-    document.getElementById('profileName').textContent = currentProfile.display_name || 'User';
-    document.getElementById('profileEmail').textContent = currentProfile.email;
-    document.getElementById('displayName').value = currentProfile.display_name || '';
-    document.getElementById('email').value = currentProfile.email;
+    document.getElementById('profileName').textContent = currentProfile.username || 'User';
+    document.getElementById('profileEmail').textContent = userEmail;
+    document.getElementById('username').value = currentProfile.username || '';
+    document.getElementById('email').value = userEmail;
     
   } catch (error) {
     console.error('Load profile error:', error);
@@ -121,13 +124,13 @@ document.getElementById('profilePictureInput').addEventListener('change', async 
 document.getElementById('profileForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   
-  const displayName = document.getElementById('displayName').value.trim();
+  const username = document.getElementById('username').value.trim();
   const saveProfileBtn = document.getElementById('saveProfileBtn');
   const saveProfileBtnText = document.getElementById('saveProfileBtnText');
   const saveProfileSpinner = document.getElementById('saveProfileSpinner');
   
-  if (!displayName) {
-    showError('Display name is required');
+  if (!username) {
+    showError('Username is required');
     return;
   }
   
@@ -141,12 +144,12 @@ document.getElementById('profileForm').addEventListener('submit', async (e) => {
     
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: displayName })
+      .update({ username: username })
       .eq('id', user.id);
     
     if (error) throw error;
     
-    document.getElementById('profileName').textContent = displayName;
+    document.getElementById('profileName').textContent = username;
     showSuccess('Profile updated successfully!');
     
   } catch (error) {

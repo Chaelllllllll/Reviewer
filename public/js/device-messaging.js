@@ -46,8 +46,8 @@ async function trackDevicePresence() {
     const user = await getCurrentUser();
     const profile = await getCurrentUserProfile();
     
-    // Use username from profile or display_name from auth
-    const displayName = profile?.username || user?.user_metadata?.display_name || 'User';
+    // Use username from profile
+    const displayName = profile?.username || 'User';
     const userId = user?.id || null;
     
     // Get current page info
