@@ -615,15 +615,30 @@ async function saveQuizQuestions(revId) {
 
     // Insert new quizzes
     if (quizQuestions.length > 0) {
-      const quizzesToInsert = quizQuestions.map((q, index) => ({
-        reviewer_id: revId,
-        question: q.question,
-        type: q.type,
-        options: q.options ? JSON.stringify(q.options) : null,
-        correct_answer: q.correct_answer,
-        points: q.points,
-        order_index: index
-      }));
+      const quizzesToInsert = quizQuestions.map((q, index) => {
+        // Ensure correct_answer is stored as index (number), not the option text
+        let correctAnswer = q.correct_answer;
+        if (typeof correctAnswer === 'string' && q.options && Array.isArray(q.options)) {
+          // If it's a string, try to find its index in options
+          const idx = q.options.findIndex(opt => String(opt) === correctAnswer);
+          if (idx !== -1) {
+            correctAnswer = idx;
+          } else if (/^\d+$/.test(correctAnswer)) {
+            // If it's a numeric string, convert to number
+            correctAnswer = parseInt(correctAnswer);
+          }
+        }
+        
+        return {
+          reviewer_id: revId,
+          question: q.question,
+          type: q.type,
+          options: q.options ? JSON.stringify(q.options) : null,
+          correct_answer: typeof correctAnswer === 'number' ? correctAnswer : 0,
+          points: q.points,
+          order_index: index
+        };
+      });
 
       const { error } = await supabase
         .from('quizzes')
