@@ -531,23 +531,38 @@ function subscribeToDirectMessages(targetDeviceId) {
   
   const myDeviceId = generateDeviceId();
   
+  console.log('Setting up realtime subscription for conversation with:', targetDeviceId.substring(0, 15) + '...');
+  
   // Subscribe to new messages in this conversation
   directMessageChannel = supabase
-    .channel(`dm:${myDeviceId}:${targetDeviceId}`)
+    .channel(`dm:${Date.now()}:${Math.random()}`) // Use unique channel name
     .on('postgres_changes', {
       event: 'INSERT',
       schema: 'public',
-      table: 'direct_messages',
-      filter: `to_device_id=eq.${myDeviceId}`
+      table: 'direct_messages'
     }, (payload) => {
-      // Only update if message is from current conversation partner
-      if (payload.new.from_device_id === targetDeviceId) {
+      console.log('Realtime message received:', {
+        from: payload.new.from_device_id?.substring(0, 15) + '...',
+        to: payload.new.to_device_id?.substring(0, 15) + '...',
+        myId: myDeviceId.substring(0, 15) + '...',
+        targetId: targetDeviceId.substring(0, 15) + '...'
+      });
+      
+      // Check if message is for current conversation
+      const isIncoming = payload.new.to_device_id === myDeviceId && payload.new.from_device_id === targetDeviceId;
+      const isOutgoing = payload.new.from_device_id === myDeviceId && payload.new.to_device_id === targetDeviceId;
+      
+      if (isIncoming) {
+        console.log('Incoming message - reloading conversation');
         loadConversation(targetDeviceId);
         markMessagesAsRead(targetDeviceId);
+      } else if (isOutgoing) {
+        console.log('Outgoing message confirmed - reloading conversation');
+        loadConversation(targetDeviceId);
       } else {
+        console.log('Message for different conversation - updating unread counts');
         // Show notification for messages from other devices
-        if (typeof showMessageNotification === 'function' && payload.new) {
-          // Get sender info from active devices
+        if (payload.new.to_device_id === myDeviceId && typeof showMessageNotification === 'function') {
           const sender = activeDevices.find(d => d.device_id === payload.new.from_device_id);
           showMessageNotification({
             type: 'direct',
@@ -558,22 +573,16 @@ function subscribeToDirectMessages(targetDeviceId) {
             deviceId: payload.new.from_device_id
           });
         }
-        // Update unread count for other conversations
         updateUnreadCounts();
       }
     })
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'direct_messages',
-      filter: `from_device_id=eq.${myDeviceId}`
-    }, (payload) => {
-      // Refresh conversation to show sent message immediately
-      if (payload.new.to_device_id === targetDeviceId) {
-        loadConversation(targetDeviceId);
+    .subscribe((status, err) => {
+      console.log('Direct message subscription status:', status);
+      if (err) console.error('Subscription error:', err);
+      if (status === 'SUBSCRIBED') {
+        console.log('Successfully subscribed to direct messages');
       }
-    })
-    .subscribe();
+    });
 }
 
 // Refresh device list manually
@@ -592,6 +601,8 @@ async function initDeviceMessaging() {
     setTimeout(initDeviceMessaging, 500);
     return;
   }
+  
+  console.log('Device messaging initializing...');
   
   // Track presence with device info
   await trackDevicePresence();
@@ -626,7 +637,9 @@ async function initDeviceMessaging() {
       await getActiveDevices();
       renderActiveDevicesList();
     })
-    .subscribe();
+    .subscribe((status) => {
+      console.log('Presence channel status:', status);
+    });
   
   // Subscribe to all incoming direct messages for notifications
   const myDeviceId = generateDeviceId();
@@ -635,34 +648,41 @@ async function initDeviceMessaging() {
     .on('postgres_changes', {
       event: 'INSERT',
       schema: 'public',
-      table: 'direct_messages',
-      filter: `to_device_id=eq.${myDeviceId}`
+      table: 'direct_messages'
     }, (payload) => {
-      console.log('New direct message notification:', payload);
+      console.log('Global DM notification received:', {
+        to: payload.new.to_device_id?.substring(0, 15) + '...',
+        myId: myDeviceId.substring(0, 15) + '...',
+        isForMe: payload.new.to_device_id === myDeviceId
+      });
       
-      // Show notification if not in current conversation
-      if (typeof showMessageNotification === 'function' && payload.new) {
+      // Only process if message is for me
+      if (payload.new.to_device_id === myDeviceId) {
         const fromDeviceId = payload.new.from_device_id;
         
-        // Don't show if currently viewing this conversation
-        if (!currentConversation || currentConversation.deviceId !== fromDeviceId) {
-          // Get sender info from active devices
-          const sender = activeDevices.find(d => d.device_id === fromDeviceId);
-          showMessageNotification({
-            type: 'direct',
-            username: sender?.username || 'Anonymous',
-            message: payload.new.message || '',
-            deviceName: sender?.device_name || 'Unknown Device',
-            timestamp: payload.new.created_at || new Date().toISOString(),
-            deviceId: fromDeviceId
-          });
+        // Show notification if not in current conversation
+        if (typeof showMessageNotification === 'function') {
+          // Don't show if currently viewing this conversation
+          if (!currentConversation || currentConversation.deviceId !== fromDeviceId) {
+            const sender = activeDevices.find(d => d.device_id === fromDeviceId);
+            showMessageNotification({
+              type: 'direct',
+              username: sender?.username || 'Anonymous',
+              message: payload.new.message || '',
+              deviceName: sender?.device_name || 'Unknown Device',
+              timestamp: payload.new.created_at || new Date().toISOString(),
+              deviceId: fromDeviceId
+            });
+          }
         }
+        
+        // Update unread counts
+        updateUnreadCounts();
       }
-      
-      // Update unread counts
-      updateUnreadCounts();
     })
-    .subscribe();
+    .subscribe((status) => {
+      console.log('Global DM channel status:', status);
+    });
   
   console.log('Device messaging initialized');
 }
