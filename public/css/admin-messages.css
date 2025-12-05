@@ -161,20 +161,20 @@
 }
 
 .admin-message-wrapper {
-  background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%) !important;
-  border: 2px solid #E91E63 !important;
-  box-shadow: 0 3px 10px rgba(233, 30, 99, 0.15), 0 1px 3px rgba(233, 30, 99, 0.2) !important;
+  background: linear-gradient(135deg, #E91E63 0%, #F06292 100%) !important;
+  border: 2px solid #C2185B !important;
+  box-shadow: 0 3px 10px rgba(233, 30, 99, 0.3), 0 1px 3px rgba(233, 30, 99, 0.2) !important;
   position: relative;
 }
 
 .admin-message-wrapper::before {
-  border-color: #fce4ec transparent transparent transparent !important;
+  border-color: #E91E63 transparent transparent transparent !important;
   border-width: 8px 8px 0 0 !important;
   left: -8px !important;
 }
 
 .admin-message-wrapper .message-content {
-  color: #333 !important;
+  color: white !important;
   font-weight: 500;
   line-height: 1.6;
 }
@@ -367,17 +367,17 @@ body.dark-mode .admin-messages-container {
 }
 
 body.dark-mode .admin-message-wrapper {
-  background: linear-gradient(135deg, #4a1f3a 0%, #5a2f4a 100%) !important;
+  background: linear-gradient(135deg, #C2185B 0%, #E91E63 100%) !important;
   border-color: #F06292 !important;
   box-shadow: 0 3px 10px rgba(240, 98, 146, 0.3), 0 1px 3px rgba(233, 30, 99, 0.2) !important;
 }
 
 body.dark-mode .admin-message-wrapper::before {
-  border-color: #4a1f3a transparent transparent transparent !important;
+  border-color: #C2185B transparent transparent transparent !important;
 }
 
 body.dark-mode .admin-message-wrapper .message-content {
-  color: #ffc4dd !important;
+  color: white !important;
 }
 
 body.dark-mode .mention-all-info-banner {
@@ -905,6 +905,82 @@ body.dark-mode .replying-to-bar {
 body.dark-mode .replying-to-bar .cancel-reply:hover {
   background: #333;
   color: #ff6b6b;
+}
+
+/* ============================================
+   VOICE MESSAGE PLAYER
+   ============================================ */
+
+.voice-message-player {
+  margin: 8px 0;
+}
+
+.voice-message-player audio {
+  width: 100%;
+  height: 40px;
+  border-radius: 20px;
+  outline: none;
+}
+
+.voice-message-player audio::-webkit-media-controls-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+}
+
+body.dark-mode .voice-message-player audio::-webkit-media-controls-panel {
+  background: rgba(42, 42, 42, 0.9);
+}
+
+/* Voice Button Styles */
+.btn-outline-pink {
+  border: 2px solid #E91E63;
+  color: #E91E63;
+  background: white;
+  transition: all 0.3s ease;
+  font-size: 1.1rem;
+}
+
+.btn-outline-pink:hover {
+  background: #E91E63;
+  color: white;
+  border-color: #E91E63;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+}
+
+.btn-outline-pink:active {
+  transform: scale(0.95);
+}
+
+.btn-outline-pink i {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.btn-outline-pink:hover i {
+  transform: scale(1.1);
+}
+
+body.dark-mode .btn-outline-pink {
+  background: #1a1a1a;
+  border-color: #F06292;
+  color: #F06292;
+}
+
+body.dark-mode .btn-outline-pink:hover {
+  background: #F06292;
+  color: white;
+}
+
+/* Voice recording UI */
+#voiceRecordingIndicator,
+#communityVoiceRecordingIndicator {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* ============================================

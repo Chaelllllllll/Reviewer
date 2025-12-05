@@ -192,6 +192,9 @@
         <div class="modal-footer border-top">
           <div class="w-100">
             <div class="input-group">
+              <button class="btn btn-outline-secondary" type="button" id="dmVoiceBtn" onclick="toggleVoiceRecording()" title="Record voice message">
+                <i class="bi bi-mic-fill"></i>
+              </button>
               <textarea 
                 class="form-control" 
                 id="dmMessageInput" 
@@ -203,6 +206,10 @@
               <button class="btn btn-pink" type="button" id="dmSendBtn" onclick="sendDirectMessage()">
                 <i class="bi bi-send-fill"></i>
               </button>
+            </div>
+            <div id="voiceRecordingIndicator" style="display: none; margin-top: 8px; color: #e91e63;">
+              <i class="bi bi-record-circle-fill"></i> Recording... <span id="recordingTimer">0:00</span>
+              <button class="btn btn-sm btn-danger ms-2" onclick="cancelVoiceRecording()">Cancel</button>
             </div>
           </div>
         </div>
@@ -265,6 +272,9 @@
               <span>Type <strong>@everyone</strong> in your message to notify all active users</span>
             </div>
             <div class="input-group">
+              <button class="btn btn-outline-secondary" type="button" id="communityVoiceBtn" onclick="toggleCommunityVoiceRecording()" title="Record voice message">
+                <i class="bi bi-mic-fill"></i>
+              </button>
               <textarea 
                 class="form-control" 
                 id="adminMessageInput" 
@@ -276,6 +286,10 @@
               <button class="btn btn-pink text-light" type="button" id="adminSendBtn" onclick="sendAdminMessage()">
                 <i class="bi bi-send-fill"></i>
               </button>
+            </div>
+            <div id="communityVoiceRecordingIndicator" style="display: none; margin-top: 8px; color: #e91e63;">
+              <i class="bi bi-record-circle-fill"></i> Recording... <span id="communityRecordingTimer">0:00</span>
+              <button class="btn btn-sm btn-danger ms-2" onclick="cancelCommunityVoiceRecording()">Cancel</button>
             </div>
           </div>
         </div>

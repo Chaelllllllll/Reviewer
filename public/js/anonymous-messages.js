@@ -506,10 +506,17 @@ function createMessageModal() {
               <div class="message-input-area">
                 <div id="messageError" class="alert alert-danger alert-sm mb-2" style="display:none;"></div>
                 <div class="input-group">
+                  <button class="btn btn-outline-pink voice-btn" type="button" id="voiceBtn" onclick="toggleVoiceRecording()" title="Record voice message">
+                    <i class="bi bi-mic-fill"></i>
+                  </button>
                   <input type="text" class="form-control border-2" id="messageInput" placeholder="Share your thoughts..." maxlength="500">
                   <button class="btn btn-pink text-light px-4" type="button" onclick="sendMessage()">
                     <i class="bi bi-send-fill"></i>
                   </button>
+                </div>
+                <div id="voiceRecordingIndicator" style="display: none; margin-top: 8px; color: #e91e63;">
+                  <i class="bi bi-record-circle-fill"></i> Recording... <span id="recordingTimer">0:00</span>
+                  <button class="btn btn-sm btn-danger ms-2" onclick="cancelVoiceRecording()">Cancel</button>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                   <small class="text-muted" id="charCount">0/500</small>
@@ -672,7 +679,7 @@ async function loadMessages() {
         const replyUsername = escapeHtml(msg.reply_to_message.username || 'User');
         const replyText = escapeHtml(msg.reply_to_message.message || '');
         replyHTML = `
-          <div class="reply-preview" onclick="scrollToMessage(${msg.reply_to})">
+          <div class="reply-preview" onclick="event.stopPropagation(); window.scrollToMessage('${msg.reply_to}'); return false;" style="cursor: pointer;">
             <span class="reply-preview-author">${replyUsername}</span>
             <span class="reply-preview-text">${replyText.substring(0, 50)}${replyText.length > 50 ? '...' : ''}</span>
           </div>
@@ -706,7 +713,14 @@ async function loadMessages() {
               </div>
               ${replyHTML}
               <div class="message-content-wrapper admin-message-wrapper${hasEveryoneMention ? ' announcement-message' : ''}">
-                <div class="message-content">${formattedMessage}</div>
+                ${msg.voice_url ? `
+                  <div class="voice-message-player">
+                    <audio controls style="max-width: 100%;">
+                      <source src="${msg.voice_url}" type="audio/webm">
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                ` : `<div class="message-content">${formattedMessage}</div>`}
               </div>
               ${reactionsHTML}
               <small class="message-time">${timeAgo}</small>
@@ -733,7 +747,14 @@ async function loadMessages() {
               </div>
               ${replyHTML}
               <div class="message-content-wrapper">
-                <div class="message-content">${sanitizedMessage}</div>
+                ${msg.voice_url ? `
+                  <div class="voice-message-player">
+                    <audio controls style="max-width: 100%;">
+                      <source src="${msg.voice_url}" type="audio/webm">
+                      Your browser does not support audio playback.
+                    </audio>
+                  </div>
+                ` : `<div class="message-content">${sanitizedMessage}</div>`}
               </div>
               ${reactionsHTML}
               <small class="message-time">${timeAgo}</small>
@@ -1384,3 +1405,156 @@ window.scrollToMessage = function(messageId) {
     }, 1000);
   }
 };
+
+// ============================================
+// VOICE MESSAGE RECORDING
+// ============================================
+
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingStartTime = null;
+let recordingTimerInterval = null;
+
+// Toggle voice recording
+window.toggleVoiceRecording = async function() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopVoiceRecording();
+  } else {
+    await startVoiceRecording();
+  }
+}
+
+// Start recording
+async function startVoiceRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+    
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      await uploadVoiceMessage(audioBlob);
+      
+      // Stop all tracks
+      stream.getTracks().forEach(track => track.stop());
+      
+      // Reset UI
+      document.getElementById('voiceRecordingIndicator').style.display = 'none';
+      document.getElementById('voiceBtn').querySelector('i').classList.remove('bi-stop-fill');
+      document.getElementById('voiceBtn').querySelector('i').classList.add('bi-mic-fill');
+      if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+      }
+    };
+    
+    mediaRecorder.start();
+    recordingStartTime = Date.now();
+    
+    // Update UI
+    document.getElementById('voiceRecordingIndicator').style.display = 'block';
+    document.getElementById('voiceBtn').querySelector('i').classList.remove('bi-mic-fill');
+    document.getElementById('voiceBtn').querySelector('i').classList.add('bi-stop-fill');
+    
+    // Start timer
+    recordingTimerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      document.getElementById('recordingTimer').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+    
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    alert('Could not access microphone. Please check permissions.');
+  }
+}
+
+// Stop recording
+function stopVoiceRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+}
+
+// Cancel recording
+window.cancelVoiceRecording = function() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    audioChunks = [];
+  }
+  document.getElementById('voiceRecordingIndicator').style.display = 'none';
+  document.getElementById('voiceBtn').querySelector('i').classList.remove('bi-stop-fill');
+  document.getElementById('voiceBtn').querySelector('i').classList.add('bi-mic-fill');
+  if (recordingTimerInterval) {
+    clearInterval(recordingTimerInterval);
+  }
+}
+
+// Upload voice message
+async function uploadVoiceMessage(audioBlob) {
+  try {
+    const filename = `voice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webm`;
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('voice-messages')
+      .upload(filename, audioBlob, {
+        contentType: 'audio/webm',
+        cacheControl: '3600'
+      });
+    
+    if (uploadError) throw uploadError;
+    
+    // Get public URL
+    const { data: urlData } = supabase
+      .storage
+      .from('voice-messages')
+      .getPublicUrl(filename);
+    
+    const voiceUrl = urlData.publicUrl;
+    
+    // Send voice message
+    await sendVoiceMessage(voiceUrl);
+    
+  } catch (error) {
+    console.error('Error uploading voice message:', error);
+    showError('Failed to send voice message. Please try again.');
+  }
+}
+
+// Send voice message
+async function sendVoiceMessage(voiceUrl) {
+  try {
+    const username = getAnonymousUsername();
+    const devId = generateDeviceId();
+    
+    const { error } = await supabase
+      .from('anonymous_messages')
+      .insert([{
+        device_id: devId,
+        username: username,
+        message: '[Voice Message]',
+        voice_url: voiceUrl,
+        reply_to: replyingToMessageId || null
+      }]);
+    
+    if (error) throw error;
+    
+    // Clear reply if any
+    if (replyingToMessageId) {
+      window.cancelReply();
+    }
+    
+    // Reload messages
+    await loadMessages();
+    
+  } catch (error) {
+    console.error('Error sending voice message:', error);
+    showError('Failed to send voice message.');
+  }
+}

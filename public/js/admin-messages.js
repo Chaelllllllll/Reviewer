@@ -8,6 +8,7 @@ let lastAdminMessageCount = 0;
 let adminMessageCheckInterval = null;
 let currentAdmin = null;
 let currentDmRecipient = null; // { id, username, is_admin }
+let dmModal = null; // Global DM modal instance
 
 // Initialize admin messaging
 async function initAdminMessages() {
@@ -204,7 +205,7 @@ function addAdminMessageToUI(message) {
       const replyUsername = message.reply_to_message.username || 'User';
       const replyText = message.reply_to_message.message || '';
       replyHTML = `
-        <div class="reply-preview" onclick="scrollToMessage(${message.reply_to})">
+        <div class="reply-preview" onclick="event.stopPropagation(); window.scrollToMessage('${message.reply_to}'); return false;" style="cursor: pointer;">
           <span class="reply-preview-author">${sanitizeHTML(replyUsername)}</span>
           <span class="reply-preview-text">${sanitizeHTML(replyText.substring(0, 50))}${replyText.length > 50 ? '...' : ''}</span>
         </div>
@@ -229,7 +230,14 @@ function addAdminMessageToUI(message) {
         </div>
         ${replyHTML}
         <div class="message-content-wrapper admin-message-wrapper${hasEveryoneMention ? ' announcement-message' : ''}">
-          <div class="message-content">${formattedMessage}</div>
+          ${message.voice_url ? `
+            <div class="voice-message-player">
+              <audio controls style="max-width: 100%;">
+                <source src="${message.voice_url}" type="audio/webm">
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+          ` : `<div class="message-content">${formattedMessage}</div>`}
         </div>
         ${message.reactions ? createReactionsHTML(message.reactions, message.id) : ''}
         <small class="message-time">${timeString}</small>
@@ -239,6 +247,19 @@ function addAdminMessageToUI(message) {
     // Anonymous user message - extract device_id for DM
     const deviceId = message.device_id || '';
     const username = message.username || 'Anonymous';
+    
+    // Check if this is a reply
+    let replyHTML = '';
+    if (message.reply_to_message) {
+      const replyUsername = message.reply_to_message.username || 'User';
+      const replyText = message.reply_to_message.message || '';
+      replyHTML = `
+        <div class="reply-preview" onclick="event.stopPropagation(); window.scrollToMessage('${message.reply_to}'); return false;" style="cursor: pointer;">
+          <span class="reply-preview-author">${sanitizeHTML(replyUsername)}</span>
+          <span class="reply-preview-text">${sanitizeHTML(replyText.substring(0, 50))}${replyText.length > 50 ? '...' : ''}</span>
+        </div>
+      `;
+    }
     
     messageDiv.innerHTML = `
       <div class="message-avatar">
@@ -253,8 +274,16 @@ function addAdminMessageToUI(message) {
         <div class="message-header">
           <strong class="message-username" style="cursor: pointer;" onclick="openDirectMessage('${deviceId}', '${sanitizeHTML(username)}', false)" title="Click to send direct message">${sanitizeHTML(username)}</strong>
         </div>
+        ${replyHTML}
         <div class="message-content-wrapper">
-          <div class="message-content">${sanitizeHTML(message.message)}</div>
+          ${message.voice_url ? `
+            <div class="voice-message-player">
+              <audio controls style="max-width: 100%;">
+                <source src="${message.voice_url}" type="audio/webm">
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+          ` : `<div class="message-content">${sanitizeHTML(message.message)}</div>`}
         </div>
         ${message.reactions ? createReactionsHTML(message.reactions, message.id) : ''}
         <small class="message-time">${timeString}</small>
@@ -525,17 +554,33 @@ async function openDirectMessage(userId, username, isAdmin = false) {
     dmModalLabel.innerHTML = `<i class="bi bi-chat-left-text-fill"></i> Message with ${sanitizeHTML(username)}`;
   }
   
-  // Show modal with higher z-index
+  // Initialize modal instance if not already created
   const dmModalEl = document.getElementById('dmModal');
-  const dmModal = new bootstrap.Modal(dmModalEl);
-  
-  // Ensure backdrop appears above the community messages modal
-  dmModalEl.addEventListener('shown.bs.modal', function() {
-    const backdrop = document.querySelector('.modal-backdrop');
-    if (backdrop) {
-      backdrop.style.zIndex = '1059';
-    }
-  }, { once: true });
+  if (!dmModal) {
+    dmModal = new bootstrap.Modal(dmModalEl);
+    
+    // Set up event listeners once
+    dmModalEl.addEventListener('shown.bs.modal', function() {
+      const backdrop = document.querySelector('.modal-backdrop');
+      if (backdrop) {
+        backdrop.style.zIndex = '1059';
+      }
+    });
+    
+    // Clean up backdrop when modal is hidden
+    dmModalEl.addEventListener('hidden.bs.modal', function() {
+      // Remove any leftover backdrops
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      backdrops.forEach(backdrop => backdrop.remove());
+      // Remove modal-open class if no other modals are open
+      const openModals = document.querySelectorAll('.modal.show');
+      if (openModals.length === 0) {
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+      }
+    });
+  }
   
   dmModal.show();
   
@@ -653,7 +698,14 @@ function addDmToUI(message) {
     messageDiv.innerHTML = `
       <div class="message-bubble ms-auto" style="max-width: 75%;">
         <div class="message-content-wrapper" style="background: linear-gradient(135deg, #E91E63 0%, #F06292 100%); color: white; border: 1px solid #E91E63;">
-          <div class="message-content">${sanitizeHTML(message.message)}</div>
+          ${message.voice_url ? `
+            <div class="voice-message-player">
+              <audio controls style="max-width: 100%;">
+                <source src="${message.voice_url}" type="audio/webm">
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+          ` : `<div class="message-content">${sanitizeHTML(message.message)}</div>`}
         </div>
         <small class="message-time text-end d-block">${timeString}</small>
       </div>
@@ -670,7 +722,14 @@ function addDmToUI(message) {
           <strong class="message-username">${sanitizeHTML(senderUsername)}</strong>
         </div>
         <div class="message-content-wrapper">
-          <div class="message-content">${sanitizeHTML(message.message)}</div>
+          ${message.voice_url ? `
+            <div class="voice-message-player">
+              <audio controls style="max-width: 100%;">
+                <source src="${message.voice_url}" type="audio/webm">
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+          ` : `<div class="message-content">${sanitizeHTML(message.message)}</div>`}
         </div>
         <small class="message-time">${timeString}</small>
       </div>
@@ -825,7 +884,27 @@ window.switchAdminTab = function(tabName) {
     usersTab.classList.add('active');
     messageInputArea.style.display = 'none';
     loadOnlineUsers();
+    // Subscribe to direct message updates for unread count
+    subscribeToDMUpdates();
   }
+}
+
+// Subscribe to direct message updates to refresh unread counts
+let dmUpdateChannel = null;
+function subscribeToDMUpdates() {
+  if (dmUpdateChannel) return; // Already subscribed
+  
+  dmUpdateChannel = supabase.channel('dm-updates')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'direct_messages',
+      filter: `to_device_id=eq.admin_${currentAdmin.id}`
+    }, () => {
+      // Refresh online users list when new DM arrives
+      loadOnlineUsers();
+    })
+    .subscribe();
 }
 
 // ============================================
@@ -902,7 +981,7 @@ async function loadOnlineUsers() {
             ${user.current_page || 'Online'} • ${user.device_name || 'Unknown Device'}
           </small>
         </div>
-        <button class="btn btn-sm btn-pink">
+        <button class="btn btn-sm btn-pink text-light">
           <i class="bi bi-chat-fill"></i>
         </button>
       `;
@@ -934,7 +1013,7 @@ function subscribeToPresence() {
 }
 
 // Scroll to a specific message
-function scrollToMessage(messageId) {
+window.scrollToMessage = function(messageId) {
   const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
   if (messageEl) {
     messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1214,6 +1293,206 @@ window.cancelReply = function() {
   }
 }
 
+// ============================================
+// VOICE MESSAGE RECORDING
+// ============================================
+
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingStartTime = null;
+let recordingTimerInterval = null;
+let isRecordingForDM = false; // true = DM, false = community
+
+// Toggle voice recording for DM
+window.toggleVoiceRecording = async function() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopVoiceRecording();
+  } else {
+    isRecordingForDM = true;
+    await startVoiceRecording('voiceRecordingIndicator', 'recordingTimer', 'dmVoiceBtn');
+  }
+}
+
+// Toggle voice recording for community
+window.toggleCommunityVoiceRecording = async function() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopVoiceRecording();
+  } else {
+    isRecordingForDM = false;
+    await startVoiceRecording('communityVoiceRecordingIndicator', 'communityRecordingTimer', 'communityVoiceBtn');
+  }
+}
+
+// Start recording
+async function startVoiceRecording(indicatorId, timerId, buttonId) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+    
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      await uploadVoiceMessage(audioBlob);
+      
+      // Stop all tracks
+      stream.getTracks().forEach(track => track.stop());
+      
+      // Reset UI
+      document.getElementById(indicatorId).style.display = 'none';
+      document.getElementById(buttonId).querySelector('i').classList.remove('bi-stop-fill');
+      document.getElementById(buttonId).querySelector('i').classList.add('bi-mic-fill');
+      if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+      }
+    };
+    
+    mediaRecorder.start();
+    recordingStartTime = Date.now();
+    
+    // Update UI
+    document.getElementById(indicatorId).style.display = 'block';
+    document.getElementById(buttonId).querySelector('i').classList.remove('bi-mic-fill');
+    document.getElementById(buttonId).querySelector('i').classList.add('bi-stop-fill');
+    
+    // Start timer
+    recordingTimerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      document.getElementById(timerId).textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+    
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    alert('Could not access microphone. Please check permissions.');
+  }
+}
+
+// Stop recording
+function stopVoiceRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+}
+
+// Cancel recording
+window.cancelVoiceRecording = function() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    audioChunks = [];
+  }
+  document.getElementById('voiceRecordingIndicator').style.display = 'none';
+  document.getElementById('dmVoiceBtn').querySelector('i').classList.remove('bi-stop-fill');
+  document.getElementById('dmVoiceBtn').querySelector('i').classList.add('bi-mic-fill');
+  if (recordingTimerInterval) {
+    clearInterval(recordingTimerInterval);
+  }
+}
+
+window.cancelCommunityVoiceRecording = function() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    audioChunks = [];
+  }
+  document.getElementById('communityVoiceRecordingIndicator').style.display = 'none';
+  document.getElementById('communityVoiceBtn').querySelector('i').classList.remove('bi-stop-fill');
+  document.getElementById('communityVoiceBtn').querySelector('i').classList.add('bi-mic-fill');
+  if (recordingTimerInterval) {
+    clearInterval(recordingTimerInterval);
+  }
+}
+
+// Upload voice message
+async function uploadVoiceMessage(audioBlob) {
+  try {
+    const filename = `voice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webm`;
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('voice-messages')
+      .upload(filename, audioBlob, {
+        contentType: 'audio/webm',
+        cacheControl: '3600'
+      });
+    
+    if (uploadError) throw uploadError;
+    
+    // Get public URL
+    const { data: urlData } = supabase
+      .storage
+      .from('voice-messages')
+      .getPublicUrl(filename);
+    
+    const voiceUrl = urlData.publicUrl;
+    
+    // Send message with voice URL
+    if (isRecordingForDM) {
+      await sendVoiceDirectMessage(voiceUrl);
+    } else {
+      await sendVoiceCommunityMessage(voiceUrl);
+    }
+    
+  } catch (error) {
+    console.error('Error uploading voice message:', error);
+    alert('Failed to send voice message. Please try again.');
+  }
+}
+
+// Send voice DM
+async function sendVoiceDirectMessage(voiceUrl) {
+  const deviceId = currentDmDeviceId;
+  const myDeviceId = `admin_${currentAdmin.id}`;
+  
+  const { error } = await supabase
+    .from('direct_messages')
+    .insert([{
+      from_device_id: myDeviceId,
+      to_device_id: deviceId,
+      message: `[Voice Message]`,
+      voice_url: voiceUrl,
+      is_admin: true
+    }]);
+  
+  if (error) {
+    console.error('Error sending voice DM:', error);
+    alert('Failed to send voice message.');
+  } else {
+    loadDirectMessages(deviceId);
+  }
+}
+
+// Send voice community message
+async function sendVoiceCommunityMessage(voiceUrl) {
+  const myDeviceId = `admin_${currentAdmin.id}`;
+  
+  const { error } = await supabase
+    .from('anonymous_messages')
+    .insert([{
+      device_id: myDeviceId,
+      username: currentAdmin.full_name || currentAdmin.email?.split('@')[0] || 'Admin',
+      message: `[Voice Message]`,
+      voice_url: voiceUrl,
+      is_admin: true,
+      reply_to: replyingToMessageId || null
+    }]);
+  
+  if (error) {
+    console.error('Error sending voice message:', error);
+    alert('Failed to send voice message.');
+  } else {
+    // Clear reply if any
+    if (replyingToMessageId) {
+      cancelReply();
+    }
+    loadAdminMessages();
+  }
+}
+
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   if (adminMessageCheckInterval) {
@@ -1227,5 +1506,8 @@ window.addEventListener('beforeunload', () => {
   }
   if (dmChannel) {
     supabase.removeChannel(dmChannel);
+  }
+  if (dmUpdateChannel) {
+    supabase.removeChannel(dmUpdateChannel);
   }
 });
