@@ -43,6 +43,35 @@ async function trackDevicePresence() {
     const deviceName = getDeviceName();
     const username = getAnonymousUsername();
     
+    // Get current page info
+    let currentPage = 'Home';
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    
+    if (path.includes('subject.html')) {
+      currentPage = 'Subjects';
+    } else if (path.includes('reviewer.html')) {
+      const subjectId = params.get('subject');
+      const reviewerId = params.get('id');
+      if (reviewerId) {
+        // Try to get reviewer title
+        try {
+          const { data } = await supabase
+            .from('reviewers')
+            .select('title')
+            .eq('id', reviewerId)
+            .single();
+          currentPage = data?.title ? `📖 ${data.title}` : 'Reviewer';
+        } catch {
+          currentPage = 'Reviewer';
+        }
+      } else if (subjectId) {
+        currentPage = 'Reviewers List';
+      }
+    } else if (path.includes('quiz.html')) {
+      currentPage = 'Quiz';
+    }
+    
     const { error } = await supabase
       .from('user_presence')
       .upsert({
@@ -51,6 +80,7 @@ async function trackDevicePresence() {
         browser: browser,
         os: os,
         username: username,
+        current_page: currentPage,
         last_seen: new Date().toISOString()
       }, {
         onConflict: 'device_id'
@@ -119,7 +149,7 @@ function renderActiveDevicesList() {
     // Escape HTML to prevent XSS
     const safeUsername = escapeHtml(device.username || 'Anonymous');
     const safeDeviceName = escapeHtml(device.device_name || 'Unknown Device');
-    const safeBrowser = escapeHtml(device.browser || '');
+    const safeCurrentPage = escapeHtml(device.current_page || 'Browsing');
     
     return `
       <div class="device-item" onclick="openDirectMessage('${device.device_id}', '${safeUsername}', '${safeDeviceName}')" style="cursor: pointer;">
@@ -135,6 +165,9 @@ function renderActiveDevicesList() {
             </div>
             <small class="text-muted d-block">
               <i class="bi bi-${deviceIcon === 'bi-laptop' ? 'laptop' : 'phone'}"></i> ${safeDeviceName}
+            </small>
+            <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+              <i class="bi bi-eye"></i> ${safeCurrentPage}
             </small>
           </div>
           <i class="bi bi-chat-dots text-muted"></i>
