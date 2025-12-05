@@ -66,6 +66,9 @@ let isBanned = false;
 let presenceChannel = null;
 let presenceUpdateInterval = null;
 let communityMessagesChannel = null;
+let replyingToMessageId = null;
+let replyingToUsername = null;
+let replyingToText = null;
 
 // Generate device fingerprint (non-bypassable identifier)
 function generateDeviceId() {
@@ -615,7 +618,10 @@ async function loadMessages() {
 
     const { data: messages, error } = await supabase
       .from('anonymous_messages')
-      .select('*')
+      .select(`
+        *,
+        reply_to_message:reply_to(id, username, message, is_admin)
+      `)
       .order('created_at', { ascending: true })
       .limit(50);
 
@@ -660,6 +666,19 @@ async function loadMessages() {
         </div>
       `;
       
+      // Build reply preview if exists
+      let replyHTML = '';
+      if (msg.reply_to_message) {
+        const replyUsername = escapeHtml(msg.reply_to_message.username || 'User');
+        const replyText = escapeHtml(msg.reply_to_message.message || '');
+        replyHTML = `
+          <div class="reply-preview" onclick="scrollToMessage(${msg.reply_to})">
+            <span class="reply-preview-author">${replyUsername}</span>
+            <span class="reply-preview-text">${replyText.substring(0, 50)}${replyText.length > 50 ? '...' : ''}</span>
+          </div>
+        `;
+      }
+      
       if (isAdmin) {
         // Admin message with pink theme
         const avatarHTML = msg.avatar_url 
@@ -672,7 +691,7 @@ async function loadMessages() {
         formattedMessage = formattedMessage.replace(/@everyone/g, '<span class="mention-everyone">@everyone</span>');
         
         return `
-          <div class="message-item">
+          <div class="message-item" data-message-id="${msg.id}">
             <div class="message-avatar admin-avatar">
               ${avatarHTML}
             </div>
@@ -681,7 +700,11 @@ async function loadMessages() {
                 <strong class="message-username admin-username" onclick="startDirectMessage('${msg.device_id}', '${sanitizedUsername}')" title="Click to send direct message to admin" style="cursor: pointer;">
                   ${sanitizedUsername}
                 </strong>
+                <button class="reply-btn" data-msg-id="${msg.id}" data-username="${sanitizedUsername}" data-preview="${escapeHtml(msg.message.substring(0, 50))}" title="Reply to this message">
+                  <i class="bi bi-reply"></i>
+                </button>
               </div>
+              ${replyHTML}
               <div class="message-content-wrapper admin-message-wrapper${hasEveryoneMention ? ' announcement-message' : ''}">
                 <div class="message-content">${formattedMessage}</div>
               </div>
@@ -695,7 +718,7 @@ async function loadMessages() {
         const sanitizedMessage = escapeHtml(msg.message);
         
         return `
-          <div class="message-item">
+          <div class="message-item" data-message-id="${msg.id}">
             <div class="message-avatar">
               <i class="bi bi-person-fill"></i>
             </div>
@@ -704,7 +727,11 @@ async function loadMessages() {
                 <strong class="message-username" onclick="window.startDirectMessage('${msg.device_id}', '${sanitizedUsername.replace(/'/g, "\\'")}'); return false;" title="Click to send direct message" style="cursor: pointer;">
                   ${sanitizedUsername}
                 </strong>
+                <button class="reply-btn" data-msg-id="${msg.id}" data-username="${sanitizedUsername}" data-preview="${escapeHtml(msg.message.substring(0, 50))}" title="Reply to this message">
+                  <i class="bi bi-reply"></i>
+                </button>
               </div>
+              ${replyHTML}
               <div class="message-content-wrapper">
                 <div class="message-content">${sanitizedMessage}</div>
               </div>
@@ -721,6 +748,19 @@ async function loadMessages() {
 
     // Update last message count
     lastMessageCount = messages.length;
+    
+    // Add event listeners to reply buttons
+    setTimeout(() => {
+      document.querySelectorAll('.reply-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          const msgId = this.getAttribute('data-msg-id');
+          const username = this.getAttribute('data-username');
+          const preview = this.getAttribute('data-preview');
+          window.replyToMessage(msgId, username, preview);
+        });
+      });
+    }, 100);
 
   } catch (error) {
     console.error('Error loading messages:', error);
@@ -833,21 +873,27 @@ async function sendMessage() {
   const sanitizedMessage = sanitizeInput(message);
 
   try {
+    const messageData = {
+      username: getAnonymousUsername(),
+      message: sanitizedMessage,
+      device_id: deviceId
+    };
+    
+    // Add reply information if replying
+    if (replyingToMessageId) {
+      messageData.reply_to = replyingToMessageId;
+    }
+    
     // Insert message into database
     const { error } = await supabase
       .from('anonymous_messages')
-      .insert([
-        {
-          username: getAnonymousUsername(),
-          message: sanitizedMessage,
-          device_id: deviceId
-        }
-      ]);
+      .insert([messageData]);
 
     if (error) throw error;
 
-    // Clear input
+    // Clear input and reply state
     input.value = '';
+    cancelReply();
     const charCount = document.getElementById('charCount');
     if (charCount) charCount.textContent = '0/500';
 
@@ -1278,5 +1324,63 @@ window.switchMessageTab = function(tabName) {
     if (typeof window.refreshDeviceList === 'function') {
       window.refreshDeviceList();
     }
+  }
+};
+
+// Reply functions
+window.replyToMessage = function(messageId, username, text) {
+  replyingToMessageId = messageId;
+  replyingToUsername = username;
+  replyingToText = text;
+  showReplyBar();
+};
+
+function showReplyBar() {
+  let replyBar = document.getElementById('replyingToBar');
+  
+  if (!replyBar) {
+    replyBar = document.createElement('div');
+    replyBar.id = 'replyingToBar';
+    replyBar.className = 'replying-to-bar';
+    
+    const messageArea = document.querySelector('#communityTab .message-input-area');
+    if (messageArea) {
+      messageArea.insertBefore(replyBar, messageArea.firstChild);
+    }
+  }
+  
+  replyBar.innerHTML = `
+    <div>
+      <i class="bi bi-reply"></i> Replying to <strong>${escapeHtml(replyingToUsername)}</strong>
+      <br><small class="text-muted">${escapeHtml(replyingToText.substring(0, 50))}${replyingToText.length > 50 ? '...' : ''}</small>
+    </div>
+    <button class="cancel-reply" onclick="cancelReply()">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  `;
+  
+  replyBar.style.display = 'flex';
+  document.getElementById('messageInput').focus();
+}
+
+window.cancelReply = function() {
+  replyingToMessageId = null;
+  replyingToUsername = null;
+  replyingToText = null;
+  
+  const replyBar = document.getElementById('replyingToBar');
+  if (replyBar) {
+    replyBar.style.display = 'none';
+  }
+};
+
+window.scrollToMessage = function(messageId) {
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (messageEl) {
+    messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    messageEl.style.animation = 'highlight 1s';
+    setTimeout(() => {
+      messageEl.style.animation = '';
+    }, 1000);
   }
 };

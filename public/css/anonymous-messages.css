@@ -687,3 +687,142 @@ body.dark-mode .alert-danger {
   color: #dc3545;
   border-color: #5a2a2a;
 }
+
+/* ============================================
+   REPLY BUTTON
+   ============================================ */
+
+.reply-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.5;
+  transition: all 0.2s;
+  border-radius: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.message-header:hover .reply-btn {
+  opacity: 1;
+}
+
+.reply-btn:hover {
+  background: rgba(233, 30, 99, 0.1);
+  color: #E91E63;
+}
+
+body.dark-mode .reply-btn {
+  color: #aaa;
+}
+
+body.dark-mode .reply-btn:hover {
+  background: rgba(240, 98, 146, 0.2);
+  color: #F06292;
+}
+
+/* ============================================
+   REPLY PREVIEW IN MESSAGES
+   ============================================ */
+
+.reply-preview {
+  background: rgba(233, 30, 99, 0.1);
+  border-left: 3px solid #E91E63;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reply-preview:hover {
+  background: rgba(233, 30, 99, 0.15);
+}
+
+body.dark-mode .reply-preview {
+  background: rgba(240, 98, 146, 0.15);
+  border-left-color: #F06292;
+}
+
+body.dark-mode .reply-preview:hover {
+  background: rgba(240, 98, 146, 0.2);
+}
+
+.reply-preview-author {
+  font-weight: 600;
+  color: #E91E63;
+  margin-right: 6px;
+}
+
+body.dark-mode .reply-preview-author {
+  color: #F06292;
+}
+
+.reply-preview-text {
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark-mode .reply-preview-text {
+  color: #adb5bd;
+}
+
+/* ============================================
+   REPLYING TO BAR
+   ============================================ */
+
+.replying-to-bar {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+body.dark-mode .replying-to-bar {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.replying-to-bar .cancel-reply {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.replying-to-bar .cancel-reply:hover {
+  background: #e9ecef;
+  color: #dc3545;
+}
+
+body.dark-mode .replying-to-bar .cancel-reply:hover {
+  background: #333;
+  color: #ff6b6b;
+}
+
+/* ============================================
+   MESSAGE HIGHLIGHTING ANIMATION
+   ============================================ */
+
+@keyframes highlight {
+  0%, 100% {
+    background: transparent;
+  }
+  50% {
+    background: rgba(233, 30, 99, 0.1);
+  }
+}
