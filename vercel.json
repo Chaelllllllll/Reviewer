@@ -1,10 +1,8 @@
 {
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/public/$1"
-    }
-  ],
+  "framework": null,
+  "installCommand": "npm install",
+  "buildCommand": "mkdir -p .vercel/output/static && cp -r public/* .vercel/output/static/",
+  "outputDirectory": ".vercel/output/static",
   "headers": [
     {
       "source": "/(.*)",

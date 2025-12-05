@@ -4,7 +4,7 @@
   "description": "A minimalist reviewer platform with baby pink design",
   "scripts": {
     "dev": "npx http-server public -p 3000 -o",
-    "build": "echo 'Static site - no build required'",
+    "build": "mkdir -p .vercel/output/static && cp -r public/* .vercel/output/static/",
     "start": "npx http-server public -p 3000"
   },
   "dependencies": {
