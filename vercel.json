@@ -1,7 +1,19 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "public": true,
+  "version": 2,
+  "builds": [
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "installCommand": "echo 'Skipping install'",
+  "buildCommand": "echo 'Skipping build'",
   "headers": [
     {
       "source": "/(.*)",
