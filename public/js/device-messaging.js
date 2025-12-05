@@ -220,6 +220,16 @@ async function openDirectMessage(deviceId, username, deviceName) {
   const bsModal = new bootstrap.Modal(modal);
   bsModal.show();
   
+  // Add event listener for when modal closes
+  modal.addEventListener('hidden.bs.modal', () => {
+    // Unsubscribe when modal closes
+    if (directMessageChannel) {
+      directMessageChannel.unsubscribe();
+      directMessageChannel = null;
+    }
+    currentConversation = null;
+  }, { once: true });
+  
   // Focus on input
   setTimeout(() => {
     const input = document.getElementById('dmInput');
