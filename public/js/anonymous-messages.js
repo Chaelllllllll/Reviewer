@@ -473,9 +473,6 @@ function createMessageModal() {
               <h5 class="modal-title mb-1">
                 <i class="bi bi-chat-dots-fill text-pink"></i> Messages
               </h5>
-              <small class="text-muted d-block">
-                <i class="bi bi-incognito"></i> Posting as <strong class="text-pink" id="currentUsername"></strong>
-              </small>
             </div>
             <div class="online-users-indicator">
               <i class="bi bi-circle-fill text-success online-pulse"></i>
@@ -583,19 +580,7 @@ async function toggleMessageModal() {
   const modal = new bootstrap.Modal(document.getElementById('messageModal'));
   modal.show();
   
-  const usernameEl = document.getElementById('currentUsername');
-  if (usernameEl) {
-    if (isBanned) {
-      usernameEl.innerHTML = '<span class="text-danger">BANNED</span>';
-    } else {
-      const username = getAnonymousUsername();
-      if (violationCount > 0) {
-        usernameEl.innerHTML = `${username} <span class="text-warning">(⚠️ ${violationCount}/5)</span>`;
-      } else {
-        usernameEl.textContent = username;
-      }
-    }
-  }
+  // Load messages when modal opens
   
   loadMessages();
   resetMessageBadge();
@@ -640,6 +625,23 @@ async function loadMessages() {
     if (!messages || messages.length === 0) {
       container.innerHTML = '<p class="text-muted text-center py-4">No messages yet. Be the first to post!</p>';
       return;
+    }
+
+    // Fetch profile pictures for all unique user_ids
+    const userIds = [...new Set(messages.filter(m => m.user_id).map(m => m.user_id))];
+    let profilePictures = {};
+    
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, profile_picture_url')
+        .in('id', userIds);
+      
+      if (profiles) {
+        profiles.forEach(profile => {
+          profilePictures[profile.id] = profile.profile_picture_url;
+        });
+      }
     }
 
     container.innerHTML = messages.map(msg => {
@@ -737,13 +739,17 @@ async function loadMessages() {
           </div>
         `;
       } else {
-        // Regular anonymous message
+        // Regular user message with profile picture
         const sanitizedMessage = escapeHtml(msg.message);
+        const profilePicUrl = msg.user_id ? profilePictures[msg.user_id] : null;
+        const avatarHTML = profilePicUrl 
+          ? `<img src="${profilePicUrl}" alt="Avatar" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 2px solid #fff;">` 
+          : `<i class="bi bi-person-fill"></i>`;
         
         return `
           <div class="message-item" data-message-id="${msg.id}">
             <div class="message-avatar">
-              <i class="bi bi-person-fill"></i>
+              ${avatarHTML}
             </div>
             <div class="message-bubble">
               <div class="message-header">
@@ -951,12 +957,13 @@ async function sendMessage() {
     }
     
     const profile = await getCurrentUserProfile();
+    const displayName = profile?.display_name || profile?.username || user?.user_metadata?.display_name || user.email;
     const messageData = {
-      username: getAnonymousUsername(),
+      username: displayName,
       message: sanitizedMessage,
       device_id: deviceId,
       identity_mode: 'real',
-      sender_display_name: profile?.display_name || user.email,
+      sender_display_name: displayName,
       user_id: user.id
     };
     
@@ -1234,7 +1241,19 @@ window.addEventListener('beforeunload', () => {
     const devId = deviceId || generateDeviceId();
     if (devId && typeof supabase !== 'undefined') {
       // Fire-and-forget, do not await — network may be blocked on unload
-      supabase.from('user_presence').upsert({ device_id: devId, last_seen: new Date().toISOString() }, { onConflict: 'device_id' });
+      // Get current user info
+      getCurrentUser().then(user => {
+        if (user) {
+          getCurrentUserProfile().then(profile => {
+            supabase.from('user_presence').upsert({ 
+              device_id: devId, 
+              user_id: user.id,
+              display_name: profile?.display_name || profile?.username || user?.user_metadata?.display_name || user.email,
+              last_seen: new Date().toISOString() 
+            }, { onConflict: 'device_id' });
+          });
+        }
+      });
     }
   } catch (e) {
     // silent

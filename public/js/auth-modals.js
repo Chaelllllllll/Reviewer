@@ -182,8 +182,10 @@ document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
     // Wait for trigger to create profile
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Mark email as verified immediately
+    // Update profile with display_name and username, and mark email as verified
     const { error: profileError } = await supabase.from('profiles').update({
+      display_name: displayName,
+      username: displayName,
       email_verified: true
     }).eq('id', data.user.id);
     

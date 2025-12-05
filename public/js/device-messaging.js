@@ -41,7 +41,16 @@ async function trackDevicePresence() {
     const devId = generateDeviceId();
     const { browser, os } = getBrowserInfo();
     const deviceName = getDeviceName();
-    const username = getAnonymousUsername();
+    
+    // Get user account info
+    const user = await getCurrentUser();
+    const profile = await getCurrentUserProfile();
+    
+    // Try to get display name from: profile.display_name > profile.username > user metadata > email
+    const displayName = profile?.display_name || profile?.username || user?.user_metadata?.display_name || user?.email || 'User';
+    const userId = user?.id || null;
+    
+    console.log('Tracking presence - User:', user?.email, 'Display Name:', displayName, 'User ID:', userId);
     
     // Get current page info
     let currentPage = 'Home';
@@ -79,7 +88,8 @@ async function trackDevicePresence() {
         device_name: deviceName,
         browser: browser,
         os: os,
-        username: username,
+        user_id: userId,
+        display_name: displayName,
         current_page: currentPage,
         last_seen: new Date().toISOString()
       }, {
@@ -109,7 +119,30 @@ async function getActiveDevices() {
     
     if (error) throw error;
     
-    activeDevices = data || [];
+    // Fetch profile pictures for users with user_id
+    const userIds = [...new Set(data.filter(d => d.user_id).map(d => d.user_id))];
+    let profilePictures = {};
+    
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, profile_picture_url')
+        .in('id', userIds);
+      
+      if (profiles) {
+        profiles.forEach(profile => {
+          profilePictures[profile.id] = profile.profile_picture_url;
+        });
+      }
+    }
+    
+    // Add profile pictures to devices
+    activeDevices = (data || []).map(device => ({
+      ...device,
+      profile_picture_url: device.user_id ? profilePictures[device.user_id] : null
+    }));
+    
+    console.log('Active devices with profiles:', activeDevices);
     
     return activeDevices;
   } catch (error) {
@@ -139,6 +172,8 @@ function renderActiveDevicesList() {
     const timeSinceLastSeen = Math.floor((Date.now() - new Date(device.last_seen)) / 1000);
     const statusClass = timeSinceLastSeen < 10 ? 'success' : 'warning';
     
+    console.log('Rendering device:', device.display_name, 'Profile pic:', device.profile_picture_url);
+    
     // Get device icon based on OS
     let deviceIcon = 'bi-laptop';
     if (device.os === 'Android' || device.os === 'iOS') deviceIcon = 'bi-phone';
@@ -147,20 +182,26 @@ function renderActiveDevicesList() {
     else if (device.os === 'Linux') deviceIcon = 'bi-ubuntu';
     
     // Escape HTML to prevent XSS
-    const safeUsername = escapeHtml(device.username || 'Anonymous');
+    const safeDisplayName = escapeHtml(device.display_name || 'User');
     const safeDeviceName = escapeHtml(device.device_name || 'Unknown Device');
     const safeCurrentPage = escapeHtml(device.current_page || 'Browsing');
     
+    // Get profile picture
+    const profilePicUrl = device.profile_picture_url;
+    const avatarHTML = profilePicUrl 
+      ? `<img src="${profilePicUrl}" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 2px solid #fff;">` 
+      : `<i class="bi bi-person-circle fs-4"></i>`;
+    
     return `
-      <div class="device-item" onclick="openDirectMessage('${device.device_id}', '${safeUsername}', '${safeDeviceName}')" style="cursor: pointer;">
+      <div class="device-item" onclick="openDirectMessage('${device.device_id}', '${safeDisplayName}', '${safeDeviceName}')" style="cursor: pointer;">
         <div class="d-flex align-items-center gap-3">
-          <div class="device-avatar">
-            <i class="bi ${deviceIcon} fs-4"></i>
-            <span class="device-status-badge bg-${statusClass}"></span>
+          <div class="device-avatar position-relative">
+            ${avatarHTML}
+            <span class="device-status-badge bg-${statusClass}" style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%;"></span>
           </div>
           <div class="flex-grow-1">
             <div class="d-flex justify-content-between align-items-center">
-              <strong class="device-username">${safeUsername}</strong>
+              <strong class="device-username">${safeDisplayName}</strong>
               ${unreadCount > 0 ? `<span class="badge bg-danger rounded-pill">${unreadCount > 99 ? '99+' : unreadCount}</span>` : ''}
             </div>
             <small class="text-muted d-block">
