@@ -135,8 +135,6 @@ function generateDeviceId() {
       } catch (e) {
         console.error('IndexedDB not available');
       }
-    } else {
-      console.log('Using existing device ID:', deviceId.substring(0, 10) + '...');
     }
   }
   return deviceId;
@@ -957,7 +955,7 @@ async function sendMessage() {
     }
     
     const profile = await getCurrentUserProfile();
-    const displayName = profile?.display_name || profile?.username || user?.user_metadata?.display_name || user.email;
+    const displayName = profile?.username || user?.user_metadata?.display_name || 'User';
     const messageData = {
       username: displayName,
       message: sanitizedMessage,
@@ -1248,7 +1246,7 @@ window.addEventListener('beforeunload', () => {
             supabase.from('user_presence').upsert({ 
               device_id: devId, 
               user_id: user.id,
-              display_name: profile?.display_name || profile?.username || user?.user_metadata?.display_name || user.email,
+              display_name: profile?.username || user?.user_metadata?.display_name || 'User',
               last_seen: new Date().toISOString() 
             }, { onConflict: 'device_id' });
           });

@@ -46,11 +46,9 @@ async function trackDevicePresence() {
     const user = await getCurrentUser();
     const profile = await getCurrentUserProfile();
     
-    // Try to get display name from: profile.display_name > profile.username > user metadata > email
-    const displayName = profile?.display_name || profile?.username || user?.user_metadata?.display_name || user?.email || 'User';
+    // Use username from profile or display_name from auth
+    const displayName = profile?.username || user?.user_metadata?.display_name || 'User';
     const userId = user?.id || null;
-    
-    console.log('Tracking presence - User:', user?.email, 'Display Name:', displayName, 'User ID:', userId);
     
     // Get current page info
     let currentPage = 'Home';
@@ -142,8 +140,6 @@ async function getActiveDevices() {
       profile_picture_url: device.user_id ? profilePictures[device.user_id] : null
     }));
     
-    console.log('Active devices with profiles:', activeDevices);
-    
     return activeDevices;
   } catch (error) {
     console.error('Error getting active devices:', error);
@@ -171,8 +167,6 @@ function renderActiveDevicesList() {
     const unreadCount = unreadCounts[device.device_id] || 0;
     const timeSinceLastSeen = Math.floor((Date.now() - new Date(device.last_seen)) / 1000);
     const statusClass = timeSinceLastSeen < 10 ? 'success' : 'warning';
-    
-    console.log('Rendering device:', device.display_name, 'Profile pic:', device.profile_picture_url);
     
     // Get device icon based on OS
     let deviceIcon = 'bi-laptop';
