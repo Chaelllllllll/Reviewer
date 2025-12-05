@@ -66,7 +66,7 @@ function displayNotification(notification) {
   const timeAgo = getTimeAgoLocal(new Date(timestamp));
   
   // Sanitize content
-  const safeUsername = escapeHtmlLocal(username || 'Anonymous');
+  const safeUsername = escapeHtmlLocal(username || 'User');
   const safeMessage = escapeHtmlLocal(message);
   const safeDeviceName = escapeHtmlLocal(deviceName || 'Unknown Device');
   
