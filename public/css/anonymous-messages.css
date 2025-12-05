@@ -82,18 +82,24 @@
 .tab-content {
   flex: 1;
   overflow: hidden;
-  display: none;
+  display: none !important;
 }
 
 .tab-content.active {
-  display: flex;
+  display: flex !important;
   flex-direction: column;
 }
 
-#communityTab {
-  display: flex;
+#communityTab,
+#directTab {
+  display: none;
   flex-direction: column;
   flex: 1;
+}
+
+#communityTab.active,
+#directTab.active {
+  display: flex;
 }
 
 #communityTab .messages-container {
