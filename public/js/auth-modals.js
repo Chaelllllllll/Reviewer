@@ -167,51 +167,40 @@ document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
   signupSpinner.classList.remove('d-none');
   
   try {
-    // Sign up without sending Supabase confirmation email
+    // Sign up and auto-confirm
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { 
-        data: { display_name: displayName },
-        emailRedirectTo: window.location.origin + '/index.html'
+        data: { display_name: displayName }
       }
-    },
-    {
-      emailRedirectTo: false // Disable automatic confirmation email
     });
     
     if (error) throw error;
     if (!data.user) throw new Error('Account creation failed. Please try again.');
     
-    currentUserId = data.user.id;
-    currentEmail = email;
+    // Wait for trigger to create profile
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Create profile
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      email: email,
-      display_name: displayName,
-      email_verified: false
-    });
+    // Mark email as verified immediately
+    const { error: profileError } = await supabase.from('profiles').update({
+      email_verified: true
+    }).eq('id', data.user.id);
     
-    // Generate and send verification code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    if (profileError) {
+      console.error('Profile update error:', profileError);
+    }
     
-    await supabase.functions.invoke('send-verification-email', {
-      body: {
-        email,
-        type: 'verification',
-        code: verificationCode,
-        userId: data.user.id
-      }
-    });
+    // Close modal and show success
+    const modal = bootstrap.Modal.getInstance(document.getElementById('signupModal'));
+    if (modal) modal.hide();
     
-    // Show verification step
-    document.getElementById('signupStep').classList.add('d-none');
-    document.getElementById('verificationStep').classList.remove('d-none');
-    document.getElementById('verificationEmail').textContent = email;
+    showSignupSuccess('Account created successfully! You can now use the app.');
     
-    showSignupSuccess('Account created! Please check your email for the verification code.');
+    // Reload to show authenticated state
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
     
   } catch (error) {
     console.error('Signup error:', error);

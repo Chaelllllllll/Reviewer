@@ -154,7 +154,7 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
         data: {
           display_name: displayName
         },
-        emailRedirectTo: window.location.origin + '/signup.html'
+        emailRedirectTo: window.location.origin + '/index.html'
       }
     },
     {
@@ -189,8 +189,10 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
     // Generate verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
+    console.log('Sending verification email...', { email, code: verificationCode });
+    
     // Send verification email
-    const { error: emailError } = await supabase.functions.invoke('send-verification-email', {
+    const { data: emailData, error: emailError } = await supabase.functions.invoke('send-verification-email', {
       body: {
         email,
         type: 'verification',
@@ -202,6 +204,8 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
     if (emailError) {
       console.error('Email error:', emailError);
       showError('Account created but failed to send verification email. Please try resending.');
+    } else {
+      console.log('Email sent successfully:', emailData);
     }
     
     // Show verification step
@@ -316,7 +320,7 @@ document.getElementById('verificationForm').addEventListener('submit', async (e)
     // Sign out and redirect to login
     await signOut();
     setTimeout(() => {
-      window.location.href = 'login.html';
+      window.location.href = 'index.html';
     }, 2000);
     
   } catch (error) {

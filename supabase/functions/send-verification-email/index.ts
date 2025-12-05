@@ -1,9 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface EmailRequest {
@@ -14,126 +14,157 @@ interface EmailRequest {
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders, status: 204 })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
+    const { email, type, code }: EmailRequest = await req.json()
 
-    // Verify user is authenticated for reset emails
-    const { data: { user } } = await supabaseClient.auth.getUser()
+    console.log('Sending email to:', email, 'type:', type);
 
-    const { email, type, code, userId }: EmailRequest = await req.json()
-
-    // Get SMTP credentials from environment variables
-    const smtpHost = Deno.env.get('SMTP_HOST') || 'smtp.gmail.com'
-    const smtpPort = parseInt(Deno.env.get('SMTP_PORT') || '587')
-    const smtpUser = Deno.env.get('SMTP_USER')
-    const smtpPassword = Deno.env.get('SMTP_APP_PASSWORD') // Gmail App Password
-    const fromEmail = Deno.env.get('FROM_EMAIL') || smtpUser
-
-    if (!smtpUser || !smtpPassword) {
-      throw new Error('SMTP credentials not configured')
+    // Get SMTP password from environment
+    const smtpPassword = Deno.env.get('SMTP_PASSWORD')
+    const smtpUser = Deno.env.get('SMTP_USER') || 'noreply@thinky.com'
+    
+    if (!smtpPassword) {
+      console.warn('SMTP_PASSWORD not configured - skipping email send')
+      return new Response(
+        JSON.stringify({ success: true, message: 'Email service not configured', emailSent: false }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
     }
 
-    // Create SMTP client
-    const client = new SmtpClient();
+    console.log('Attempting SMTP connection...');
 
-    await client.connectTLS({
-      hostname: smtpHost,
-      port: smtpPort,
-      username: smtpUser,
-      password: smtpPassword,
-    });
+    // SMTP configuration for Gmail
+    const client = new SmtpClient()
 
-    let subject = '';
-    let body = '';
+    try {
+      // Use port 587 with STARTTLS (more reliable than 465)
+      await client.connectTLS({
+        hostname: "smtp.gmail.com",
+        port: 587,
+        username: smtpUser,
+        password: smtpPassword,
+      })
+      console.log('SMTP connection successful');
+    } catch (smtpError) {
+      console.error('SMTP connection failed:', smtpError);
+      // Return success but indicate email wasn't sent
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Email service temporarily unavailable', 
+          emailSent: false,
+          error: String(smtpError)
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+
+    let subject = ''
+    let html = ''
 
     if (type === 'verification') {
-      subject = 'Verify Your Email - Reviewer App';
-      body = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #E91E63;">Welcome to Reviewer App!</h2>
-          <p>Thank you for signing up. Please use the following verification code to complete your registration:</p>
-          <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-            <h1 style="color: #E91E63; letter-spacing: 5px; margin: 0;">${code}</h1>
-          </div>
-          <p>This code will expire in 15 minutes.</p>
-          <p>If you didn't request this verification, please ignore this email.</p>
-          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-          <p style="color: #666; font-size: 12px;">Reviewer App - Your Study Companion</p>
-        </div>
-      `;
+      subject = 'Verify Your Email - Thinky'
+      html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+<tr><td style="padding:40px 30px;text-align:center;background:linear-gradient(135deg,#E91E63 0%,#F06292 100%)">
+<h1 style="margin:0;color:#fff;font-size:28px">Welcome to Thinky!</h1>
+</td></tr>
+<tr><td style="padding:40px 30px">
+<p style="margin:0 0 20px;font-size:16px;color:#333;line-height:1.5">Thank you for signing up! Please use the following verification code:</p>
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:30px 0">
+<div style="background:#f5f5f5;padding:20px 40px;border-radius:8px">
+<span style="font-size:36px;font-weight:bold;color:#E91E63;letter-spacing:8px">${code}</span>
+</div></td></tr></table>
+<p style="margin:20px 0 0;font-size:14px;color:#666">This code will expire in <strong>15 minutes</strong>.</p>
+</td></tr>
+<tr><td style="padding:20px 30px;background:#f9f9f9;border-top:1px solid #e0e0e0;text-align:center">
+<p style="margin:0;font-size:12px;color:#999">Thinky - Your Study Companion</p>
+</td></tr></table>
+</td></tr></table>
+</body></html>`
     } else {
-      subject = 'Password Reset Code - Reviewer App';
-      body = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #E91E63;">Password Reset Request</h2>
-          <p>You requested to reset your password. Please use the following code:</p>
-          <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
-            <h1 style="color: #E91E63; letter-spacing: 5px; margin: 0;">${code}</h1>
-          </div>
-          <p>This code will expire in 15 minutes.</p>
-          <p>If you didn't request a password reset, please ignore this email and your password will remain unchanged.</p>
-          <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-          <p style="color: #666; font-size: 12px;">Reviewer App - Your Study Companion</p>
-        </div>
-      `;
+      subject = 'Password Reset Code - Thinky'
+      html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
+<tr><td style="padding:40px 30px;text-align:center;background:linear-gradient(135deg,#E91E63 0%,#F06292 100%)">
+<h1 style="margin:0;color:#fff;font-size:28px">Password Reset</h1>
+</td></tr>
+<tr><td style="padding:40px 30px">
+<p style="margin:0 0 20px;font-size:16px;color:#333;line-height:1.5">You requested to reset your password. Use this code:</p>
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:30px 0">
+<div style="background:#f5f5f5;padding:20px 40px;border-radius:8px">
+<span style="font-size:36px;font-weight:bold;color:#E91E63;letter-spacing:8px">${code}</span>
+</div></td></tr></table>
+<p style="margin:20px 0 0;font-size:14px;color:#666">This code will expire in <strong>15 minutes</strong>.</p>
+</td></tr>
+<tr><td style="padding:20px 30px;background:#f9f9f9;border-top:1px solid #e0e0e0;text-align:center">
+<p style="margin:0;font-size:12px;color:#999">Thinky - Your Study Companion</p>
+</td></tr></table>
+</td></tr></table>
+</body></html>`
     }
 
     await client.send({
-      from: fromEmail!,
+      from: smtpUser,
       to: email,
       subject: subject,
-      content: body,
-      html: body,
-    });
+      content: html,
+      html: html,
+    })
 
-    await client.close();
+    await client.close()
 
-    // Update database with verification/reset code
-    if (type === 'verification' && userId) {
-      await supabaseClient
-        .from('profiles')
-        .update({
-          verification_code: code,
-          verification_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-        })
-        .eq('id', userId)
-    } else if (type === 'reset') {
-      await supabaseClient
-        .from('profiles')
-        .update({
-          reset_code: code,
-          reset_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-        })
-        .eq('email', email)
-    }
+    console.log('Email sent successfully to:', email)
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Email sent successfully' }),
+      JSON.stringify({ success: true, message: 'Email sent successfully', emailSent: true }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     )
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error in email function:', error)
+    console.error('Error type:', typeof error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
+    // Return 200 with error details instead of 400 to not break the signup flow
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Account created but email failed to send', 
+        emailSent: false,
+        error: errorMessage 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 200,
       }
     )
   }

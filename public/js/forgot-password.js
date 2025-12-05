@@ -281,7 +281,7 @@ document.getElementById('passwordForm').addEventListener('submit', async (e) => 
     showSuccess('Password reset successfully! Redirecting to login...');
     
     setTimeout(() => {
-      window.location.href = 'login.html';
+      window.location.href = 'index.html';
     }, 2000);
     
   } catch (error) {

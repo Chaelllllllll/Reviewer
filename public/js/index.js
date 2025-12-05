@@ -30,7 +30,7 @@ async function initializeUserNav() {
     document.getElementById('logoutBtn')?.addEventListener('click', async (e) => {
       e.preventDefault();
       await signOut();
-      window.location.href = '/login.html';
+      window.location.href = '/index.html';
     });
   }
 }

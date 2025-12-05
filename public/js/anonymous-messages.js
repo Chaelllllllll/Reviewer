@@ -507,15 +507,6 @@ function createMessageModal() {
                 </div>
               </div>
               <div class="message-input-area">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="identityModeSwitch" checked>
-                    <label class="form-check-label" for="identityModeSwitch">
-                      <small><i class="bi bi-incognito"></i> <span id="identityModeLabel">Anonymous Mode</span></small>
-                    </label>
-                  </div>
-                  <small class="text-muted" id="identityHint">Posting anonymously</small>
-                </div>
                 <div id="messageError" class="alert alert-danger alert-sm mb-2" style="display:none;"></div>
                 <div class="input-group">
                   <button class="btn btn-outline-pink voice-btn" type="button" id="voiceBtn" onclick="toggleVoiceRecording()" title="Record voice message">
@@ -845,10 +836,9 @@ function initIdentityModeToggle() {
   }
 }
 
-// Get current identity mode
+// Get current identity mode (always real now)
 function getIdentityMode() {
-  const toggle = document.getElementById('identityModeSwitch');
-  return toggle && toggle.checked ? 'anonymous' : 'real';
+  return 'real';
 }
 
 // Send message
@@ -953,23 +943,22 @@ async function sendMessage() {
   const sanitizedMessage = sanitizeInput(message);
 
   try {
-    const identityMode = getIdentityMode();
+    // Always use real identity
+    const user = await getCurrentUser();
+    if (!user) {
+      showError('You must be logged in to send messages.');
+      return;
+    }
+    
+    const profile = await getCurrentUserProfile();
     const messageData = {
       username: getAnonymousUsername(),
       message: sanitizedMessage,
       device_id: deviceId,
-      identity_mode: identityMode
+      identity_mode: 'real',
+      sender_display_name: profile?.display_name || user.email,
+      user_id: user.id
     };
-    
-    // If using real identity, add display name
-    if (identityMode === 'real') {
-      const user = await getCurrentUser();
-      if (user) {
-        const profile = await getCurrentUserProfile();
-        messageData.sender_display_name = profile?.display_name || user.email;
-        messageData.user_id = user.id; // Add user_id for real identity messages
-      }
-    }
     
     // Add reply information if replying
     if (replyingToMessageId) {

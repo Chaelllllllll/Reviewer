@@ -59,12 +59,12 @@ async function requireAuth() {
   const currentPath = window.location.pathname;
   
   // Public pages that don't require auth
-  const publicPages = ['/login.html', '/signup.html', '/forgot-password.html', '/admin/login.html'];
-  const isPublicPage = publicPages.some(page => currentPath.endsWith(page));
+  const publicPages = ['/index.html', '/forgot-password.html', '/admin/login.html'];
+  const isPublicPage = publicPages.some(page => currentPath.endsWith(page)) || currentPath === '/';
   
   if (!user && !isPublicPage) {
     // Not authenticated and not on a public page - redirect to login
-    window.location.href = '/login.html';
+    window.location.href = '/index.html';
     return false;
   }
   
@@ -80,7 +80,7 @@ async function requireAuth() {
       // Email not verified - sign out and redirect
       await signOut();
       alert('Please verify your email before accessing the app.');
-      window.location.href = '/signup.html';
+      window.location.href = '/index.html';
       return false;
     }
   }
