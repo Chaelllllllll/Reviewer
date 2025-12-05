@@ -1,6 +1,40 @@
 // In-memory cache of courses for filtering
 let allCourses = [];
 
+// Initialize user navigation
+async function initializeUserNav() {
+  const navbarMenu = document.getElementById('navbarMenu');
+  if (!navbarMenu) return;
+  
+  const profile = await getCurrentUserProfile();
+  
+  if (profile) {
+    const profilePic = profile.profile_picture_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(profile.display_name || profile.email);
+    
+    // Add profile and logout buttons
+    navbarMenu.innerHTML += `
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <img src="${profilePic}" alt="Profile" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+          <span>${profile.display_name || 'User'}</span>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+          <li><a class="dropdown-item" href="/profile.html"><i class="bi bi-person-circle me-2"></i>Profile</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+        </ul>
+      </li>
+    `;
+    
+    // Add logout handler
+    document.getElementById('logoutBtn')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await signOut();
+      window.location.href = '/login.html';
+    });
+  }
+}
+
 // Load and display all courses with their subjects
 async function loadCourses() {
   try {
@@ -79,7 +113,7 @@ async function loadCourses() {
                         </div>
                         <div class="card-body d-flex flex-column">
                           <p class="card-text flex-grow-1 small">${escapeHtml(subject.description || 'No description available.')}</p>
-                          <a href="/subject.html?id=${subject.id}" class="btn btn-pink btn-sm w-100 mt-2 text-light">
+                          <a href="/subject.html?id=${subject.id}" class="btn btn-pink btn-sm w-100 mt-2 text-light subject-link" data-subject-id="${subject.id}">
                             <i class="bi bi-eye"></i> View Reviewers
                           </a>
                         </div>
@@ -236,4 +270,35 @@ function filterCourses(q) {
       </div>
     </div>
   `}).join('');
+  
+  // Add click event listeners to subject links
+  setTimeout(() => {
+    document.querySelectorAll('.subject-link').forEach(link => {
+      link.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        // Check if user is authenticated
+        const user = await getCurrentUser();
+        if (!user) {
+          // Show auth modal
+          const authModal = new bootstrap.Modal(document.getElementById('authModal'));
+          authModal.show();
+          return;
+        }
+        
+        // Check if email is verified
+        const profile = await getCurrentUserProfile();
+        if (!profile || !profile.email_verified) {
+          // Show auth modal
+          const authModal = new bootstrap.Modal(document.getElementById('authModal'));
+          authModal.show();
+          return;
+        }
+        
+        // User is authenticated and verified, allow navigation
+        window.location.href = link.href;
+      });
+    });
+  }, 100);
 }
+

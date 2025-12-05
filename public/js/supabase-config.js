@@ -26,9 +26,83 @@ async function getCurrentUser() {
 // Check if user is authenticated
 async function checkAuth() {
   const user = await getCurrentUser();
-  if (!user && window.location.pathname.includes('/admin/') && !window.location.pathname.includes('/admin/login.html')) {
-    window.location.href = '/admin/login.html';
+  
+  // Admin pages check
+  if (window.location.pathname.includes('/admin/') && !window.location.pathname.includes('/admin/login.html')) {
+    if (!user) {
+      window.location.href = '/admin/login.html';
+      return false;
+    }
+    
+    // Verify user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+    
+    if (!profile || !profile.is_admin) {
+      // Not an admin - sign out and redirect
+      await signOut();
+      alert('Access denied. This area is restricted to administrators only.');
+      window.location.href = '/admin/login.html';
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+// Check if user is authenticated for main app (not admin pages)
+async function requireAuth() {
+  const user = await getCurrentUser();
+  const currentPath = window.location.pathname;
+  
+  // Public pages that don't require auth
+  const publicPages = ['/login.html', '/signup.html', '/forgot-password.html', '/admin/login.html'];
+  const isPublicPage = publicPages.some(page => currentPath.endsWith(page));
+  
+  if (!user && !isPublicPage) {
+    // Not authenticated and not on a public page - redirect to login
+    window.location.href = '/login.html';
     return false;
   }
+  
+  if (user && !isPublicPage) {
+    // Check if email is verified
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email_verified')
+      .eq('id', user.id)
+      .single();
+    
+    if (!profile || !profile.email_verified) {
+      // Email not verified - sign out and redirect
+      await signOut();
+      alert('Please verify your email before accessing the app.');
+      window.location.href = '/signup.html';
+      return false;
+    }
+  }
+  
   return true;
+}
+
+// Get current user profile
+async function getCurrentUserProfile() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  
+  if (error) {
+    console.error('Profile error:', error);
+    return null;
+  }
+  
+  return profile;
 }

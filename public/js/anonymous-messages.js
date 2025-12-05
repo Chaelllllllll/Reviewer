@@ -435,6 +435,9 @@ async function initFloatingMessages() {
 
   // Create message modal
   createMessageModal();
+  
+  // Initialize identity mode toggle
+  initIdentityModeToggle();
 
   // Load messages and start polling
   loadMessages();
@@ -504,6 +507,15 @@ function createMessageModal() {
                 </div>
               </div>
               <div class="message-input-area">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="identityModeSwitch" checked>
+                    <label class="form-check-label" for="identityModeSwitch">
+                      <small><i class="bi bi-incognito"></i> <span id="identityModeLabel">Anonymous Mode</span></small>
+                    </label>
+                  </div>
+                  <small class="text-muted" id="identityHint">Posting anonymously</small>
+                </div>
                 <div id="messageError" class="alert alert-danger alert-sm mb-2" style="display:none;"></div>
                 <div class="input-group">
                   <button class="btn btn-outline-pink voice-btn" type="button" id="voiceBtn" onclick="toggleVoiceRecording()" title="Record voice message">
@@ -642,7 +654,13 @@ async function loadMessages() {
     container.innerHTML = messages.map(msg => {
       const date = new Date(msg.created_at);
       const timeAgo = getTimeAgo(date);
-      const sanitizedUsername = escapeHtml(msg.username);
+      
+      // Determine display name based on identity mode
+      let displayName = msg.username;
+      if (msg.identity_mode === 'real' && msg.sender_display_name) {
+        displayName = msg.sender_display_name;
+      }
+      const sanitizedUsername = escapeHtml(displayName);
       const isAdmin = msg.is_admin || false;
       
       // Parse reactions from JSON/JSONB
@@ -792,6 +810,47 @@ async function loadMessages() {
   }
 }
 
+// Initialize identity mode toggle
+function initIdentityModeToggle() {
+  const toggle = document.getElementById('identityModeSwitch');
+  const label = document.getElementById('identityModeLabel');
+  const hint = document.getElementById('identityHint');
+  
+  if (!toggle) return;
+  
+  // Load saved preference
+  const savedMode = localStorage.getItem('messageIdentityMode') || 'anonymous';
+  toggle.checked = (savedMode === 'anonymous');
+  updateIdentityModeUI(toggle.checked);
+  
+  // Handle toggle change
+  toggle.addEventListener('change', function() {
+    const isAnonymous = this.checked;
+    updateIdentityModeUI(isAnonymous);
+    
+    // Save preference
+    localStorage.setItem('messageIdentityMode', isAnonymous ? 'anonymous' : 'real');
+  });
+  
+  function updateIdentityModeUI(isAnonymous) {
+    if (isAnonymous) {
+      label.innerHTML = '<i class="bi bi-incognito"></i> <span id="identityModeLabel">Anonymous Mode</span>';
+      hint.textContent = 'Posting anonymously';
+      hint.style.color = '#6c757d';
+    } else {
+      label.innerHTML = '<i class="bi bi-person-circle"></i> <span id="identityModeLabel">Real Identity</span>';
+      hint.textContent = 'Posting with your name';
+      hint.style.color = '#E91E63';
+    }
+  }
+}
+
+// Get current identity mode
+function getIdentityMode() {
+  const toggle = document.getElementById('identityModeSwitch');
+  return toggle && toggle.checked ? 'anonymous' : 'real';
+}
+
 // Send message
 async function sendMessage() {
   const input = document.getElementById('messageInput');
@@ -894,11 +953,23 @@ async function sendMessage() {
   const sanitizedMessage = sanitizeInput(message);
 
   try {
+    const identityMode = getIdentityMode();
     const messageData = {
       username: getAnonymousUsername(),
       message: sanitizedMessage,
-      device_id: deviceId
+      device_id: deviceId,
+      identity_mode: identityMode
     };
+    
+    // If using real identity, add display name
+    if (identityMode === 'real') {
+      const user = await getCurrentUser();
+      if (user) {
+        const profile = await getCurrentUserProfile();
+        messageData.sender_display_name = profile?.display_name || user.email;
+        messageData.user_id = user.id; // Add user_id for real identity messages
+      }
+    }
     
     // Add reply information if replying
     if (replyingToMessageId) {

@@ -2,7 +2,16 @@
 async function checkIfLoggedIn() {
   const user = await getCurrentUser();
   if (user) {
-    window.location.href = '/admin/dashboard.html';
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+    
+    if (profile && profile.is_admin) {
+      window.location.href = '/admin/dashboard.html';
+    }
   }
 }
 
@@ -26,7 +35,25 @@ async function handleLogin(event) {
     
     if (error) throw error;
     
-    // Success - redirect to dashboard
+    // Check if user is an admin
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', data.user.id)
+      .single();
+    
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      throw new Error('Failed to verify admin status');
+    }
+    
+    if (!profile || !profile.is_admin) {
+      // Not an admin - sign out and show error
+      await signOut();
+      throw new Error('Access denied. This area is restricted to administrators only.');
+    }
+    
+    // Success - user is admin, redirect to dashboard
     window.location.href = '/admin/dashboard.html';
     
   } catch (error) {
