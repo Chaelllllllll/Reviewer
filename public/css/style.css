@@ -10,6 +10,24 @@
   --shadow: rgba(255, 180, 208, 0.15);
 }
 
+/* Dark Mode Variables */
+body.dark-mode {
+  --pink-primary: #fd77ad;
+  --pink-light: #2a1a23;
+  --pink-lighter: #1a1419;
+  --pink-dark: #a03768;
+  --pink-darker: #fd77ad;
+  --text-dark: #e8e8e8;
+  --text-light: #b8b8b8;
+  --white: #1f1f1f;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --bg-primary: #1a1419;
+  --bg-secondary: #1f1f1f;
+  --bg-tertiary: #2a1a23;
+  --border-color: #3a2a33;
+  --code-bg: #2a2a2a;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -249,3 +267,181 @@ body {
 .bg-pink-lighter {
   background-color: var(--pink-lighter) !important;
 }
+
+/* Dark Mode Styles */
+body.dark-mode {
+  background-color: var(--bg-primary);
+}
+
+body.dark-mode .navbar {
+  background-color: var(--bg-secondary) !important;
+  box-shadow: 0 2px 10px var(--shadow);
+}
+
+body.dark-mode .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+body.dark-mode .card {
+  background-color: var(--bg-secondary);
+  color: var(--text-dark);
+  box-shadow: 0 5px 15px var(--shadow);
+}
+
+body.dark-mode .card-header {
+  background-color: var(--bg-tertiary);
+  color: var(--text-dark);
+}
+
+body.dark-mode .hero {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-tertiary) 100%);
+}
+
+body.dark-mode .footer {
+  background-color: var(--bg-secondary);
+  color: var(--text-light);
+  box-shadow: 0 -2px 10px var(--shadow);
+}
+
+body.dark-mode .form-control {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-dark);
+}
+
+body.dark-mode .form-control:focus {
+  background-color: var(--bg-tertiary);
+  border-color: var(--pink-primary);
+  color: var(--text-dark);
+}
+
+body.dark-mode .input-group-text {
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--border-color);
+  color: var(--text-light);
+}
+
+body.dark-mode .quiz-option {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-dark);
+}
+
+body.dark-mode .quiz-option:hover {
+  border-color: var(--pink-primary);
+  background-color: var(--bg-primary);
+}
+
+body.dark-mode .quiz-option.selected {
+  background-color: var(--pink-light);
+  border-color: var(--pink-dark);
+}
+
+body.dark-mode .quiz-header {
+  background: linear-gradient(90deg, var(--bg-tertiary), var(--bg-primary));
+  border-bottom: 1px solid var(--border-color);
+}
+
+body.dark-mode .content-section {
+  background-color: var(--bg-secondary);
+  color: var(--text-dark);
+}
+
+body.dark-mode .content-section h1,
+body.dark-mode .content-section h2,
+body.dark-mode .content-section h3,
+body.dark-mode .content-section h4,
+body.dark-mode .content-section h5,
+body.dark-mode .content-section h6 {
+  color: var(--pink-darker);
+}
+
+body.dark-mode .content-section p,
+body.dark-mode .content-section li {
+  color: var(--text-dark);
+}
+
+body.dark-mode .content-section table {
+  color: var(--text-dark);
+}
+
+body.dark-mode .content-section table th {
+  background-color: var(--bg-tertiary);
+  color: var(--pink-darker);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .content-section table td {
+  border-color: var(--border-color);
+}
+
+body.dark-mode .content-section pre {
+  background-color: var(--code-bg);
+  border-left-color: var(--pink-primary);
+  color: var(--text-dark);
+}
+
+body.dark-mode .content-section code {
+  background-color: var(--bg-tertiary);
+  color: var(--pink-darker);
+}
+
+body.dark-mode .btn-outline-pink {
+  color: var(--pink-darker);
+  border-color: var(--pink-primary);
+}
+
+body.dark-mode .btn-outline-pink:hover {
+  background-color: var(--pink-primary);
+  color: #1f1f1f;
+}
+
+body.dark-mode .text-muted {
+  color: var(--text-light) !important;
+}
+
+body.dark-mode .question-missing {
+  background: rgba(220,53,69,0.1);
+  border-color: #dc3545;
+  color: var(--text-dark);
+}
+
+/* Dark Mode Toggle Button */
+.dark-mode-toggle {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: var(--pink-primary);
+  border: none;
+  box-shadow: 0 4px 15px var(--shadow);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.dark-mode-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+.dark-mode-toggle i {
+  color: white;
+}
+
+body.dark-mode .dark-mode-toggle {
+  background-color: var(--pink-darker);
+  color: white;
+}
+
+body.dark-mode .dark-mode-toggle i {
+  color: white;
+}
+

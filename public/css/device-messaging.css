@@ -344,6 +344,8 @@
   font-size: 0.95rem;
   transition: all 0.3s ease;
   background: #f8f9fa;
+  resize: none;
+  overflow: hidden;
 }
 
 #dmInput:focus {
@@ -417,8 +419,120 @@
 
 .tab-content {
   display: none;
+  flex: 1;
+  overflow: hidden;
 }
 
 .tab-content.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
+
+/* Dark Mode Support for Device Messaging */
+body.dark-mode #directMessageModal .modal-content {
+  background-color: #1f1f1f;
+  color: #e8e8e8;
+}
+
+body.dark-mode #directMessageModal .modal-header {
+  background-color: #1f1f1f;
+  border-bottom-color: #3a2a33;
+}
+
+body.dark-mode #directMessageModal .modal-footer {
+  background-color: #1f1f1f;
+  border-top-color: #3a2a33;
+}
+
+body.dark-mode #directMessageModal .btn-close {
+  filter: invert(1);
+}
+
+body.dark-mode .devices-container {
+  background: #1a1419;
+}
+
+body.dark-mode .device-item {
+  border-bottom-color: #3a2a33;
+  color: #e8e8e8;
+}
+
+body.dark-mode .device-item:hover {
+  background-color: #2a1a23;
+}
+
+body.dark-mode .device-username {
+  color: #e8e8e8;
+}
+
+body.dark-mode #dmContainer {
+  background: #1a1419;
+}
+
+body.dark-mode .message-from-them .message-content-dm {
+  background: #2a1a23;
+  color: #e8e8e8;
+  border-color: #3a2a33;
+}
+
+body.dark-mode .message-from-them .message-content-dm::after {
+  border-color: transparent #2a1a23 transparent transparent;
+}
+
+body.dark-mode #dmInput {
+  background-color: #2a1a23 !important;
+  border-color: #3a2a33 !important;
+  color: #e8e8e8 !important;
+}
+
+body.dark-mode #dmInput:focus {
+  background-color: #2a1a23 !important;
+  border-color: #E91E63 !important;
+  color: #e8e8e8 !important;
+}
+
+body.dark-mode #dmInput::placeholder {
+  color: #888 !important;
+}
+
+body.dark-mode .message-time-dm {
+  color: #888;
+}
+
+body.dark-mode #activeDevicesSection {
+  background: #1f1f1f;
+}
+
+body.dark-mode .section-header {
+  border-bottom-color: #3a2a33;
+}
+
+body.dark-mode .section-title {
+  color: #fd77ad;
+}
+
+body.dark-mode .online-indicator-text {
+  color: #b8b8b8;
+}
+
+body.dark-mode .empty-devices-state {
+  color: #888;
+}
+
+body.dark-mode .empty-devices-state i {
+  color: #555;
+}
+
+body.dark-mode .message-tab {
+  color: #b8b8b8;
+}
+
+body.dark-mode .message-tab:hover {
+  color: #fd77ad;
+  background: #2a1a23;
+}
+
+body.dark-mode .message-tab.active {
+  color: #fd77ad;
+}
+

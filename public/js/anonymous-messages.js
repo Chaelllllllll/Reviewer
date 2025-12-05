@@ -442,7 +442,7 @@ async function initFloatingMessages() {
 function createMessageModal() {
   const modalHTML = `
     <div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content shadow-lg border-0">
           <div class="modal-header border-0 pb-2">
             <div class="flex-grow-1">
