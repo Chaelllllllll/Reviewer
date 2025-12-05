@@ -247,8 +247,8 @@ function initInstallNotifications() {
         clearInterval(installNotificationInterval);
         installNotificationInterval = null;
       }
-    }, 1000); // 10 minutes10 * 60 * 1000
-  }, 1000); // 10 minutes
+    }, 10 * 60 * 1000); // 10 minutes10 * 60 * 1000
+  }, 10 * 60 * 1000); // 10 minutes
 }
 
 // Capture the beforeinstallprompt event
