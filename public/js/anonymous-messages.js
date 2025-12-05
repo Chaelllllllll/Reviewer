@@ -243,6 +243,130 @@ function sanitizeInput(text) {
   return div.innerHTML;
 }
 
+// Detect hacking attempts
+function detectHackingAttempt(text) {
+  const hackPatterns = [
+    // HTML/Script injection - broad patterns
+    /<[^>]*script/gi,
+    /<[^>]*iframe/gi,
+    /<[^>]*object/gi,
+    /<[^>]*embed/gi,
+    /<[^>]*applet/gi,
+    /<[^>]*link/gi,
+    /<[^>]*style/gi,
+    /<[^>]*meta/gi,
+    /<[^>]*base/gi,
+    /<[^>]*form/gi,
+    /<[^>]*input/gi,
+    /<[^>]*button/gi,
+    /<[^>]*textarea/gi,
+    /<[^>]*img[^>]*src/gi,
+    /<[^>]*video/gi,
+    /<[^>]*audio/gi,
+    /<[^>]*svg/gi,
+    
+    // Event handlers - any on* attribute
+    /\bon\w+\s*=/gi,
+    /\s+on\w+\s*:/gi,
+    
+    // JavaScript protocols and functions
+    /javascript\s*:/gi,
+    /data\s*:\s*text\s*\/\s*html/gi,
+    /vbscript\s*:/gi,
+    /\beval\s*\(/gi,
+    /\bexec\s*\(/gi,
+    /\bFunction\s*\(/gi,
+    /\bsetTimeout\s*\(/gi,
+    /\bsetInterval\s*\(/gi,
+    /\balert\s*\(/gi,
+    /\bprompt\s*\(/gi,
+    /\bconfirm\s*\(/gi,
+    
+    // SQL injection - broader patterns
+    /\b(select|union|insert|update|delete|drop|create|alter|truncate|execute|exec|declare)\b.*\b(from|into|table|database|where|and|or|join)\b/gi,
+    /;\s*(select|union|insert|update|delete|drop)/gi,
+    /'.*or.*'.*=/gi,
+    /".*or.*".*=/gi,
+    /\b1\s*=\s*1\b/gi,
+    /\b1\s*'\s*or\s*'1\s*'\s*=\s*'1/gi,
+    /--.*$/gm,
+    /\/\*.*\*\//g,
+    
+    // Template/Code injection
+    /<\?php/gi,
+    /<\?=/gi,
+    /<%.*%>/gi,
+    /\$\{[^}]*\}/g,
+    /\{\{[^}]*\}\}/g,
+    /#\{[^}]*\}/g,
+    
+    // DOM/Cookie manipulation
+    /document\s*\.\s*cookie/gi,
+    /document\s*\.\s*write/gi,
+    /document\s*\.\s*writeln/gi,
+    /window\s*\.\s*location/gi,
+    /window\s*\.\s*open/gi,
+    /window\s*\[\s*['"`]/gi,
+    /localStorage/gi,
+    /sessionStorage/gi,
+    /\.innerHTML/gi,
+    /\.outerHTML/gi,
+    
+    // URL encoding attempts
+    /%3C/gi, // <
+    /%3E/gi, // >
+    /%22/gi, // "
+    /%27/gi, // '
+    /&#x/gi,
+    /&#\d/gi,
+    /\\x[0-9a-f]{2}/gi,
+    /\\u[0-9a-f]{4}/gi,
+    
+    // File system/command injection
+    /\.\.\//g,
+    /\.\.\\/g,
+    /\/etc\/passwd/gi,
+    /\/bin\/bash/gi,
+    /cmd\.exe/gi,
+    /powershell/gi,
+    /\bwget\b/gi,
+    /\bcurl\b/gi,
+    
+    // Base64 encoded attempts
+    /base64\s*,/gi,
+    
+    // Null byte injection
+    /%00/gi,
+    /\x00/g,
+    
+    // LDAP injection
+    /\|\|/g,
+    /&&/g,
+    
+    // XPath injection
+    /\/\//g,
+    /\[.*\]/g
+  ];
+  
+  // Check for excessive special characters (possible obfuscation)
+  const specialCharRatio = (text.match(/[<>{}[\]()$%&*;]/g) || []).length / text.length;
+  if (specialCharRatio > 0.3 && text.length > 10) {
+    return true;
+  }
+  
+  // Check for unusual character sequences
+  if (/[<>]{2,}/.test(text) || /[{}]{2,}/.test(text) || /[()]{3,}/.test(text)) {
+    return true;
+  }
+  
+  for (const pattern of hackPatterns) {
+    if (pattern.test(text)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Check for blocklisted words
 function containsBlocklistedWords(text) {
   const lowerText = text.toLowerCase();
@@ -555,6 +679,22 @@ async function sendMessage() {
 
   if (message.length > 500) {
     showError('Message is too long. Maximum 500 characters.');
+    return;
+  }
+
+  // Check for hacking attempts
+  if (detectHackingAttempt(message)) {
+    const nowBanned = await logViolation();
+    if (nowBanned) {
+      showError('SECURITY ALERT: Hacking attempt detected. You have been PERMANENTLY BANNED for attempting to inject malicious code.', true);
+      input.disabled = true;
+      input.placeholder = 'Account banned - Security violation';
+      isBanned = true;
+    } else {
+      const remainingWarnings = 5 - violationCount;
+      showError(`SECURITY WARNING ${violationCount}/5: Hacking attempt detected! Attempting to inject scripts, HTML, or malicious code is prohibited. ${remainingWarnings} warning(s) remaining before permanent ban.`, false);
+    }
+    input.value = '';
     return;
   }
 

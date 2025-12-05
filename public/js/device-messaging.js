@@ -401,6 +401,22 @@ async function sendDirectMessage() {
     return;
   }
   
+  // Check for hacking attempts (reuse from anonymous messages)
+  if (typeof detectHackingAttempt === 'function' && detectHackingAttempt(message)) {
+    showDmError('SECURITY ALERT: Hacking attempt detected! Attempting to inject scripts, HTML, SQL, or malicious code is prohibited and has been logged. Repeated attempts will result in a permanent ban.');
+    input.value = '';
+    
+    // Log the security violation
+    try {
+      console.warn('Security violation detected in DM:', {
+        deviceId: generateDeviceId().substring(0, 15) + '...',
+        timestamp: new Date().toISOString(),
+        attempt: 'Code injection'
+      });
+    } catch (e) {}
+    return;
+  }
+  
   // Check for blocklisted words (reuse from anonymous messages)
   if (typeof containsBlocklistedWords === 'function' && containsBlocklistedWords(message)) {
     showDmError('Your message contains inappropriate content and cannot be sent.');
